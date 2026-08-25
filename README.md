@@ -59,8 +59,20 @@ A User owns Senders and Batches. An EmailBatch owns EmailJobs. The EmailJob is t
 ## Persistence Guarantees
 PostgreSQL is the authoritative source of email state. The database guarantees uniqueness of user emails, idempotency keys for jobs, and strict sequence ordering within a batch. It survives process and queue restarts. Note: Database idempotency alone does not guarantee no duplicate SMTP delivery in a distributed environment (this will be addressed in the worker phase).
 
+## Queue & Worker Architecture (Phase 3)
+- **BullMQ**: Acts as the scheduling and queue layer. Jobs are enqueued containing only the `emailJobId`.
+- **Redis**: Provides persistence for BullMQ, storing the delayed jobs and active queues.
+- **Worker**: Consumes jobs, claims them atomically in PostgreSQL to ensure single execution, processes them, and records the `SENT` or `FAILED` state back to the database.
+- **Delayed Jobs**: Scheduled jobs calculate their delay and wait in Redis natively without polling schedulers.
+- **Worker Concurrency**: Configured via the `WORKER_CONCURRENCY` environment variable.
+- **Idempotent Processing**: Workers verify job status before proceeding. If a job is already `SENT` or cannot be atomically transitioned from `SCHEDULED` to `PROCESSING`, it is safely ignored.
+
+## Local Infrastructure
+- **Starting Services**: Run `docker compose up -d` to start PostgreSQL and Redis.
+- **Environment Variables**: Use `.env.example` to set up `DATABASE_URL` and `REDIS_URL`.
+
 ## Current Project Status
-**Phase 2**: Persistence layer & Domain Model complete. Scheduler and worker logic are planned for future phases.
+**Phase 3**: Queue infrastructure and BullMQ worker foundation implemented. Ready for application/API layer.
 
 ## Testing
 Run `npm run test` from the root to execute all workspace tests.

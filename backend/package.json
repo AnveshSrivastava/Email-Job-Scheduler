@@ -6,6 +6,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:worker": "tsx watch src/worker.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "vitest run",
@@ -15,8 +16,10 @@
   },
   "dependencies": {
     "@prisma/client": "^6.4.1",
+    "bullmq": "^6.2.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "ioredis": "^6.0.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

@@ -45,4 +45,12 @@ export class EmailJobRepository {
       },
     });
   }
+
+  async claimForProcessing(id: string): Promise<boolean> {
+    const result = await this.prisma.emailJob.updateMany({
+      where: { id, status: EmailJobStatus.SCHEDULED },
+      data: { status: EmailJobStatus.PROCESSING },
+    });
+    return result.count > 0;
+  }
 }

@@ -18,14 +18,13 @@ Establish a boring, predictable, reproducible foundation for a full-stack email 
 *   Frontend basic scaffolding (Vite, React, Tailwind)
 *   Database domain models via Prisma
 *   Database persistence layers (Repositories)
+*   BullMQ worker architecture (Queue, Redis)
+*   Worker-level restart/idempotency behavior
 
 ### PLANNED
 *   Authentication (Google OAuth)
 *   Email scheduling API
-*   BullMQ worker architecture
 *   Distributed throttling & rate limiting
-*   Idempotency handling (worker level reconciliation)
-*   Restart and failure behavior
 *   Frontend dashboard
 
 ## Domain Model (Phase 2)
