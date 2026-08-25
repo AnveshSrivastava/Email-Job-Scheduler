@@ -54,11 +54,12 @@ describe('Queue & Worker Integration Tests', () => {
   const createDummyJobInDb = async (
     scheduledAt: Date = new Date(),
     status: import('@prisma/client').EmailJobStatus = EmailJobStatus.SCHEDULED,
+    customSenderId?: string,
   ) => {
     const batch = await batchRepo.createWithJobs(
       {
         userId,
-        senderId,
+        senderId: customSenderId || senderId,
         subject: 'Queue Test Batch',
         body: 'Queue Test Body',
         startAt: new Date(),
@@ -108,7 +109,7 @@ describe('Queue & Worker Integration Tests', () => {
     startEmailWorker({ emailSender: mockEmailSender });
 
     // Wait a bit for processing
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
     // Verify state
     const processedJob = await jobRepo.findById(dbJob.id);
@@ -141,7 +142,7 @@ describe('Queue & Worker Integration Tests', () => {
     await enqueueEmailJob(dbJob.id);
 
     // Wait a bit for processing
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
     // We verify it didn't throw and status is still SENT. The worker log would show "already SENT"
     const jobAfter = await jobRepo.findById(dbJob.id);
@@ -160,7 +161,15 @@ describe('Queue & Worker Integration Tests', () => {
 
   it('H. Failure - simulated processing failure', async () => {
     const { vi } = await import('vitest');
-    const dbJob = await createDummyJobInDb();
+
+    // Create an isolated sender to avoid rate limits from earlier tests
+    const isolatedSender = await prisma.sender.create({
+      data: {
+        userId,
+        email: `isolated-h-${Date.now()}@example.com`,
+      },
+    });
+    const dbJob = await createDummyJobInDb(new Date(), EmailJobStatus.SCHEDULED, isolatedSender.id);
 
     // Spy on prototype to affect the worker's instance of EmailJobRepository
     const spy = vi
@@ -178,7 +187,7 @@ describe('Queue & Worker Integration Tests', () => {
 
     try {
       await enqueueEmailJob(dbJob.id);
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const failedJob = await jobRepo.findById(dbJob.id);
       expect(failedJob?.status).toBe(EmailJobStatus.FAILED);

@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app';
 import { PrismaClient } from '@prisma/client';
 import { UserRepository } from '../../src/infrastructure/repositories/user.repository';
+import { EmailBatchRepository } from '../../src/infrastructure/repositories/email-batch.repository';
+
 import { SenderRepository } from '../../src/infrastructure/repositories/sender.repository';
 import { closeEmailQueue } from '../../src/infrastructure/queue/email.queue';
 import { closeEmailWorker } from '../../src/infrastructure/queue/email.worker';
@@ -355,6 +357,98 @@ describe('Campaign API Integration Tests', () => {
         const job2 = await prisma.emailJob.findUnique({ where: { id: batch!.jobs[1].id } });
         expect(job2?.status).toBe('SENT');
       }, 10000); // increase timeout for E2E
+    });
+    it('10. should list campaigns for user', async () => {
+      const res = await request(app)
+        .get('/api/v1/campaigns')
+        .set('Cookie', authCookie1)
+        .expect(200);
+
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.pagination.total).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('Retry Campaign Jobs', () => {
+    it('11. should reset FAILED jobs to SCHEDULED and increment attempts', async () => {
+      // Create a batch with one FAILED job
+      const batchRepo = new EmailBatchRepository(prisma);
+      const batch = await batchRepo.createWithJobs(
+        {
+          userId: userId1,
+          senderId: senderId1,
+          subject: 'Retry Test',
+          body: 'Retry Body',
+          startAt: new Date(),
+          delaySeconds: 0,
+          hourlyLimit: 100,
+          totalCount: 1,
+        },
+        [
+          {
+            senderId: senderId1,
+            sequenceNumber: 1,
+            idempotencyKey: `retry-key-${Date.now()}`,
+            recipient: 'retry@example.com',
+            subject: 'Retry Test',
+            body: 'Retry Body',
+            scheduledAt: new Date(),
+            status: 'FAILED',
+            errorMessage: 'Fake error',
+          },
+        ],
+      );
+
+      const res = await request(app)
+        .post(`/api/v1/campaigns/${batch.id}/retry`)
+        .set('Cookie', authCookie1)
+        .expect(200);
+
+      expect(res.body.data.retriedCount).toBe(1);
+      expect(res.body.data.batchId).toBe(batch.id);
+
+      // Verify DB state
+      const updatedJob = await prisma.emailJob.findFirst({
+        where: { batchId: batch.id },
+      });
+
+      expect(updatedJob!.status).toBe('SCHEDULED');
+      expect(updatedJob!.attempts).toBe(1);
+      expect(updatedJob!.errorMessage).toBeNull();
+    });
+
+    it('12. should reject retry if no failed jobs', async () => {
+      // Create a batch with one SENT job
+      const batchRepo = new EmailBatchRepository(prisma);
+      const batch = await batchRepo.createWithJobs(
+        {
+          userId: userId1,
+          senderId: senderId1,
+          subject: 'No Retry Test',
+          body: 'No Retry Body',
+          startAt: new Date(),
+          delaySeconds: 0,
+          hourlyLimit: 100,
+          totalCount: 1,
+        },
+        [
+          {
+            senderId: senderId1,
+            sequenceNumber: 1,
+            idempotencyKey: `noretry-key-${Date.now()}`,
+            recipient: 'noretry@example.com',
+            subject: 'No Retry Test',
+            body: 'No Retry Body',
+            scheduledAt: new Date(),
+            status: 'SENT',
+          },
+        ],
+      );
+
+      await request(app)
+        .post(`/api/v1/campaigns/${batch.id}/retry`)
+        .set('Cookie', authCookie1)
+        .expect(400);
     });
   });
 });

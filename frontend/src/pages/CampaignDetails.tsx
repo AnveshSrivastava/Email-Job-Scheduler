@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import type { Campaign, Job } from '../types';
-import { ArrowLeft, Clock, Mail, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Clock, Mail, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 
 export const CampaignDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [retryLoading, setRetryLoading] = useState(false);
   const [error, setError] = useState('');
 
   const [page, setPage] = useState(1);
@@ -30,6 +31,20 @@ export const CampaignDetails: React.FC = () => {
       setError(errorObj.response?.data?.error?.message || 'Failed to load campaign');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    try {
+      setRetryLoading(true);
+      await apiClient.post(`/campaigns/${id}/retry`);
+      await fetchCampaign(); // Refresh data
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorObj = err as any;
+      alert(errorObj.response?.data?.error?.message || 'Failed to retry jobs');
+    } finally {
+      setRetryLoading(false);
     }
   };
 
@@ -79,21 +94,69 @@ export const CampaignDetails: React.FC = () => {
       </Link>
 
       <div className="bg-white shadow rounded-lg p-6 mb-8">
-        <h2 className="text-2xl font-bold mb-4">{campaign.subject}</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="flex justify-between items-start mb-4">
+          <h2 className="text-2xl font-bold">{campaign.subject}</h2>
+          {campaign.stats && campaign.stats.FAILED > 0 && (
+            <button
+              onClick={handleRetry}
+              disabled={retryLoading}
+              className="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded text-sm font-medium hover:bg-red-100 flex items-center gap-2 disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={retryLoading ? 'animate-spin' : ''} />
+              {retryLoading ? 'Retrying...' : `Retry ${campaign.stats.FAILED} Failed Jobs`}
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm mb-6">
           <div className="bg-gray-50 p-3 rounded border">
-            <span className="block text-gray-500 mb-1">Total Recipients</span>
+            <span className="block text-gray-500 mb-1">Total Jobs</span>
             <span className="font-semibold text-lg">{campaign.totalCount}</span>
           </div>
-          <div className="bg-gray-50 p-3 rounded border">
+          {campaign.stats && (
+            <>
+              <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                <span className="block text-blue-600 mb-1 flex items-center gap-1">
+                  <Clock size={14} /> Scheduled
+                </span>
+                <span className="font-semibold text-lg text-blue-700">
+                  {campaign.stats.SCHEDULED + campaign.stats.PENDING}
+                </span>
+              </div>
+              <div className="bg-yellow-50 p-3 rounded border border-yellow-100">
+                <span className="block text-yellow-600 mb-1 flex items-center gap-1">
+                  <RefreshCw size={14} /> Processing
+                </span>
+                <span className="font-semibold text-lg text-yellow-700">
+                  {campaign.stats.PROCESSING}
+                </span>
+              </div>
+              <div className="bg-green-50 p-3 rounded border border-green-100">
+                <span className="block text-green-600 mb-1 flex items-center gap-1">
+                  <CheckCircle size={14} /> Sent
+                </span>
+                <span className="font-semibold text-lg text-green-700">{campaign.stats.SENT}</span>
+              </div>
+              <div className="bg-red-50 p-3 rounded border border-red-100">
+                <span className="block text-red-600 mb-1 flex items-center gap-1">
+                  <XCircle size={14} /> Failed
+                </span>
+                <span className="font-semibold text-lg text-red-700">{campaign.stats.FAILED}</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm pt-4 border-t">
+          <div>
             <span className="block text-gray-500 mb-1">Hourly Limit</span>
-            <span className="font-semibold text-lg">{campaign.hourlyLimit}</span>
+            <span className="font-semibold">{campaign.hourlyLimit}</span>
           </div>
-          <div className="bg-gray-50 p-3 rounded border">
+          <div>
             <span className="block text-gray-500 mb-1">Delay</span>
-            <span className="font-semibold text-lg">{campaign.delaySeconds}s</span>
+            <span className="font-semibold">{campaign.delaySeconds}s</span>
           </div>
-          <div className="bg-gray-50 p-3 rounded border">
+          <div>
             <span className="block text-gray-500 mb-1">Start At</span>
             <span className="font-semibold">{new Date(campaign.startAt).toLocaleString()}</span>
           </div>
@@ -117,7 +180,7 @@ export const CampaignDetails: React.FC = () => {
                 <th className="px-6 py-3">Recipient</th>
                 <th className="px-6 py-3">Status</th>
                 <th className="px-6 py-3">Scheduled At</th>
-                <th className="px-6 py-3">Sent At</th>
+                <th className="px-6 py-3">Sent/Failed At</th>
                 <th className="px-6 py-3">Error</th>
               </tr>
             </thead>
@@ -129,13 +192,22 @@ export const CampaignDetails: React.FC = () => {
                     <div className="flex items-center gap-2">
                       {getStatusIcon(job.status)}
                       <span className="font-semibold">{job.status}</span>
+                      {job.attempts > 1 && (
+                        <span className="text-xs bg-gray-200 px-1.5 py-0.5 rounded text-gray-700">
+                          Retry {job.attempts - 1}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-gray-500">
                     {new Date(job.scheduledAt).toLocaleString()}
                   </td>
                   <td className="px-6 py-4 text-gray-500">
-                    {job.sentAt ? new Date(job.sentAt).toLocaleString() : '-'}
+                    {job.sentAt
+                      ? new Date(job.sentAt).toLocaleString()
+                      : job.failedAt
+                        ? new Date(job.failedAt).toLocaleString()
+                        : '-'}
                   </td>
                   <td
                     className="px-6 py-4 text-red-500 max-w-xs truncate"

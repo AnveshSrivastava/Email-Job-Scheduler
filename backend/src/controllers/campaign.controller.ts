@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { CreateCampaignUseCase } from '../application/campaigns/create-campaign.use-case';
-import { ValidationError } from '../errors/application-error';
+import { RetryCampaignUseCase } from '../application/campaigns/retry-campaign.use-case';
+import { ValidationError, NotFoundError, ForbiddenError } from '../errors/application-error';
 import { prisma } from '../infrastructure/database/prisma';
 import { EmailBatchRepository } from '../infrastructure/repositories/email-batch.repository';
 import { EmailJobRepository } from '../infrastructure/repositories/email-job.repository';
@@ -13,6 +14,7 @@ const batchRepo = new EmailBatchRepository(prisma);
 const jobRepo = new EmailJobRepository(prisma);
 const senderRepo = new SenderRepository(prisma);
 const createCampaignUseCase = new CreateCampaignUseCase(batchRepo, senderRepo, jobRepo);
+const retryCampaignUseCase = new RetryCampaignUseCase(prisma, batchRepo, jobRepo);
 
 const createCampaignSchema = z.object({
   senderId: z.string().uuid('Invalid sender ID'),
@@ -152,14 +154,35 @@ export const getCampaign = async (req: Request, res: Response, next: NextFunctio
 
     const batch = await batchRepo.findById(id);
     if (!batch) {
-      throw new ValidationError('Campaign not found'); // Should be NotFoundError, let's just use it
+      throw new NotFoundError('Campaign not found');
     }
 
     if (batch.userId !== userId) {
-      throw new ValidationError('Unauthorized');
+      throw new ForbiddenError('Unauthorized');
     }
 
-    res.json({ data: batch });
+    // Fetch aggregate stats
+    const statsResult = await prisma.emailJob.groupBy({
+      by: ['status'],
+      where: { batchId: id },
+      _count: { status: true },
+    });
+
+    const stats = {
+      PENDING: 0,
+      SCHEDULED: 0,
+      PROCESSING: 0,
+      SENT: 0,
+      FAILED: 0,
+    };
+
+    statsResult.forEach((stat) => {
+      if (stat.status in stats) {
+        stats[stat.status as keyof typeof stats] = stat._count.status;
+      }
+    });
+
+    res.json({ data: { ...batch, stats } });
   } catch (error) {
     next(error);
   }
@@ -193,6 +216,48 @@ export const getCampaignJobs = async (req: Request, res: Response, next: NextFun
         total,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCampaigns = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const page = Math.max(1, parseInt((req.query.page as string) || '1', 10));
+    const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || '20', 10)));
+    const skip = (page - 1) * limit;
+
+    const [total, batches] = await Promise.all([
+      prisma.emailBatch.count({ where: { userId } }),
+      prisma.emailBatch.findMany({
+        where: { userId },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    res.json({
+      data: batches,
+      pagination: {
+        page,
+        limit,
+        total,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const retryCampaign = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    const result = await retryCampaignUseCase.execute(userId, id);
+    res.json({ data: result });
   } catch (error) {
     next(error);
   }

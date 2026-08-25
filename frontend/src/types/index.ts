@@ -20,6 +20,13 @@ export interface Campaign {
   hourlyLimit: number;
   totalCount: number;
   createdAt: string;
+  stats?: {
+    PENDING: number;
+    SCHEDULED: number;
+    PROCESSING: number;
+    SENT: number;
+    FAILED: number;
+  };
 }
 
 export interface Job {
@@ -30,6 +37,7 @@ export interface Job {
   sentAt?: string;
   failedAt?: string;
   errorMessage?: string;
+  attempts: number;
 }
 
 export interface Pagination {
