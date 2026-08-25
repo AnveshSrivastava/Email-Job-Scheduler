@@ -24,6 +24,23 @@ export class EmailJobRepository {
     });
   }
 
+  async findPaginatedByBatchId(batchId: string, page: number, limit: number, status?: EmailJobStatus) {
+    const skip = (page - 1) * limit;
+    const where = { batchId, ...(status ? { status } : {}) };
+
+    const [total, jobs] = await Promise.all([
+      this.prisma.emailJob.count({ where }),
+      this.prisma.emailJob.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { sequenceNumber: 'asc' }
+      })
+    ]);
+
+    return { total, jobs };
+  }
+
   async findScheduled(limit: number = 100): Promise<EmailJob[]> {
     return this.prisma.emailJob.findMany({
       where: { status: EmailJobStatus.SCHEDULED },

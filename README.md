@@ -74,7 +74,46 @@ PostgreSQL is the authoritative source of email state. The database guarantees u
 - **Environment Variables**: Use `.env.example` to set up `DATABASE_URL` and `REDIS_URL`. Ethereal SMTP credentials should be filled in for `SMTP_USER` and `SMTP_PASSWORD`.
 
 ## Current Project Status
-**Phase 4**: Queue infrastructure, Ethereal SMTP delivery, and distributed throttling implemented. Ready for application/API layer.
+**Phase 5**: Complete Campaign Scheduling & Ingestion API implemented. Supports JSON and CSV uploads.
+
+## API Overview
+### Base URL
+`http://localhost:3000/api/v1`
+
+### Endpoints
+* `POST /campaigns` - Create a new email campaign (JSON).
+* `POST /campaigns/import` - Create a campaign via CSV upload (multipart/form-data).
+* `GET /campaigns/:id` - Retrieve campaign metadata.
+* `GET /campaigns/:id/jobs` - Retrieve paginated jobs for a campaign.
+
+### Example: Create Campaign
+```bash
+curl -X POST http://localhost:3000/api/v1/campaigns \\
+  -H "Content-Type: application/json" \\
+  -H "x-user-id: <user-uuid>" \\
+  -d '{
+    "senderId": "<sender-uuid>",
+    "subject": "Hello",
+    "body": "World",
+    "startAt": "2026-08-25T15:00:00.000Z",
+    "delaySeconds": 2,
+    "hourlyLimit": 100,
+    "recipients": [{"email": "alice@example.com"}]
+  }'
+```
+
+### Example: CSV Import
+```bash
+curl -X POST http://localhost:3000/api/v1/campaigns/import \\
+  -H "x-user-id: <user-uuid>" \\
+  -F "senderId=<sender-uuid>" \\
+  -F "subject=Hello CSV" \\
+  -F "body=World" \\
+  -F "startAt=2026-08-25T15:00:00.000Z" \\
+  -F "delaySeconds=2" \\
+  -F "hourlyLimit=100" \\
+  -F "file=@recipients.csv"
+```
 
 ## Testing
 Run `npm run test` from the root to execute all workspace tests.

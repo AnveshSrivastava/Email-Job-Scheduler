@@ -23,10 +23,10 @@ Establish a boring, predictable, reproducible foundation for a full-stack email 
 *   Distributed throttling & rate limiting (Redis Lua script)
 *   Minimum delay enforcement (Redis Atomic)
 *   SMTP Delivery (Nodemailer / Ethereal SMTP)
+*   Email scheduling API (Campaign creation, JSON, CSV ingestion)
 
 ### PLANNED
 *   Authentication (Google OAuth)
-*   Email scheduling API
 *   Frontend dashboard
 
 ## Domain Model (Phase 2)
@@ -58,3 +58,8 @@ User
 *   Fetch scheduled jobs: `WHERE status = 'SCHEDULED' ORDER BY scheduledAt` -> Handled by composite index `@@index([status, scheduledAt])`.
 *   Fetch jobs for batch: `WHERE batchId = ? ORDER BY sequenceNumber` -> Handled by index `@@index([batchId])`.
 *   Uniqueness constraints prevent race conditions during insertion and ensure idempotency.
+
+## Application Layer & Queue Consistency (Phase 5)
+- **HTTP API to Queue**: When a user creates a campaign, the HTTP controller forwards the request to the `CreateCampaignUseCase`.
+- **Transaction Boundary**: The use case atomically creates the `EmailBatch` and all constituent `EmailJob` records in PostgreSQL within a single Prisma transaction, marking them as `SCHEDULED`.
+- **Consistency Trade-off (Post-Commit Enqueue)**: Due to the 48-hour assignment limitation, we chose a simple post-commit best-effort enqueue rather than a full transactional outbox pattern. This means if the API process crashes *exactly* after the DB transaction commits but *before* jobs are sent to BullMQ, the jobs will remain stuck in the `SCHEDULED` state. While a true distributed system would require an outbox table and a sweeper, the current design favors architectural simplicity and limits surface area. This behavior was explicitly chosen over a cron sweeper.
