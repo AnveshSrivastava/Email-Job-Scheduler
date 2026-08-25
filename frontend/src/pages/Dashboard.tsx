@@ -34,7 +34,6 @@ export const Dashboard: React.FC = () => {
 
   const fetchDashboardData = async () => {
     try {
-      setFetchingData(true);
       const [sendersRes, campaignsRes] = await Promise.all([
         apiClient.get('/senders'),
         apiClient.get('/campaigns'),
@@ -58,7 +57,7 @@ export const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchDashboardData();
+    (async () => await fetchDashboardData())();
   }, []);
 
   const createSender = async (e: React.FormEvent) => {
@@ -377,7 +376,7 @@ export const Dashboard: React.FC = () => {
                   {activeTab === 'json' ? (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Recipients (comma separated emails)
+                        Recipients (comma or newline separated emails)
                       </label>
                       <textarea
                         required

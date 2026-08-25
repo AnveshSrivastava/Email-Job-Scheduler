@@ -277,6 +277,22 @@ describe('Campaign API Integration Tests', () => {
       expect(response.body.pagination.total).toBe(2);
     });
 
+    it("7b. should reject retrieving another user's campaign metadata", async () => {
+      const response = await request(app)
+        .get(`/api/v1/campaigns/${testBatchId}`)
+        .set('Cookie', authCookie2);
+
+      expect(response.status).toBeGreaterThanOrEqual(400);
+    });
+
+    it("8b. should reject retrieving another user's campaign jobs", async () => {
+      const response = await request(app)
+        .get(`/api/v1/campaigns/${testBatchId}/jobs`)
+        .set('Cookie', authCookie2);
+
+      expect(response.status).toBeGreaterThanOrEqual(400);
+    });
+
     describe('End-to-End System Test', () => {
       let e2eUserId: string;
       let e2eSenderId: string;

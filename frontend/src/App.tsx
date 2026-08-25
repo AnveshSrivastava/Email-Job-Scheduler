@@ -17,7 +17,7 @@ function App() {
           path="/dashboard"
           element={
             user ? (
-              <Layout user={user}>
+              <Layout user={user} setUser={setUser}>
                 <Dashboard />
               </Layout>
             ) : (
@@ -29,7 +29,7 @@ function App() {
           path="/campaigns/:id"
           element={
             user ? (
-              <Layout user={user}>
+              <Layout user={user} setUser={setUser}>
                 <CampaignDetails />
               </Layout>
             ) : (

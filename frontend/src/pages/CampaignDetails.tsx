@@ -15,9 +15,9 @@ export const CampaignDetails: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const fetchCampaign = async () => {
+  const fetchCampaign = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const [batchRes, jobsRes] = await Promise.all([
         apiClient.get(`/campaigns/${id}`),
         apiClient.get(`/campaigns/${id}/jobs?page=${page}&limit=10`),
@@ -30,7 +30,7 @@ export const CampaignDetails: React.FC = () => {
       const errorObj = err as any;
       setError(errorObj.response?.data?.error?.message || 'Failed to load campaign');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -53,6 +53,25 @@ export const CampaignDetails: React.FC = () => {
     if (id) fetchCampaign();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, page]);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+
+    if (campaign?.stats) {
+      const activeJobs =
+        campaign.stats.SCHEDULED + campaign.stats.PENDING + campaign.stats.PROCESSING;
+      if (activeJobs > 0) {
+        interval = setInterval(() => {
+          fetchCampaign(false);
+        }, 3000);
+      }
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign?.stats?.SCHEDULED, campaign?.stats?.PENDING, campaign?.stats?.PROCESSING, id, page]);
 
   if (loading && !campaign) {
     return <div className="flex justify-center p-12">Loading...</div>;
@@ -168,7 +187,10 @@ export const CampaignDetails: React.FC = () => {
           <h3 className="font-bold text-lg flex items-center gap-2">
             <Mail size={18} /> Jobs
           </h3>
-          <button onClick={fetchCampaign} className="text-sm text-blue-600 hover:underline">
+          <button
+            onClick={() => fetchCampaign(true)}
+            className="text-sm text-blue-600 hover:underline"
+          >
             Refresh
           </button>
         </div>

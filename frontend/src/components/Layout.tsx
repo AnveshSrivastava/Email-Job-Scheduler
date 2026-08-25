@@ -7,14 +7,16 @@ import { LogOut } from 'lucide-react';
 interface LayoutProps {
   children: React.ReactNode;
   user: User | null;
+  setUser: (u: User | null) => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, user }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, user, setUser }) => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
       await apiClient.post('/auth/logout');
+      setUser(null);
       navigate('/');
     } catch (e) {
       console.error('Logout failed', e);
