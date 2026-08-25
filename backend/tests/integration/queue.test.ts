@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaClient, EmailJobStatus } from '@prisma/client';
+import { EMAIL_QUEUE_NAME } from '../../src/infrastructure/queue/email.job.types';
 import { getRedisConnection } from '../../src/infrastructure/queue/queue.connection';
 import {
   enqueueEmailJob,
@@ -28,6 +29,7 @@ describe('Queue & Worker Integration Tests', () => {
     // A. Redis connectivity sanity check
     const testClient = getRedisConnection();
     await testClient.ping();
+    await getEmailQueue().obliterate({ force: true });
     testClient.disconnect();
 
     // Setup necessary database relations to be able to create EmailJobs
@@ -87,7 +89,8 @@ describe('Queue & Worker Integration Tests', () => {
 
   it('B. Queue creation - queue can be instantiated', () => {
     const queue = getEmailQueue();
-    expect(queue.name).toBe('email-send');
+
+    expect(queue.name).toBe(EMAIL_QUEUE_NAME);
   });
 
   it('C. Immediate job enqueue & E. Worker processing', async () => {
@@ -160,40 +163,76 @@ describe('Queue & Worker Integration Tests', () => {
   });
 
   it('H. Failure - simulated processing failure', async () => {
-    const { vi } = await import('vitest');
+    // 1. Fully isolate: stop the existing worker
+    await closeEmailWorker();
 
-    // Create an isolated sender to avoid rate limits from earlier tests
+    // 2. Create isolated sender and job
     const isolatedSender = await prisma.sender.create({
       data: {
         userId,
         email: `isolated-h-${Date.now()}@example.com`,
       },
     });
-    const dbJob = await createDummyJobInDb(new Date(), EmailJobStatus.SCHEDULED, isolatedSender.id);
 
-    // Spy on prototype to affect the worker's instance of EmailJobRepository
-    const spy = vi
-      .spyOn(EmailJobRepository.prototype, 'updateStatus')
-      .mockImplementationOnce(async function (id, status, extra) {
-        if (id === dbJob.id && status === EmailJobStatus.SENT) {
+    // Use a unique recipient to trigger the failure exclusively
+    const failingRecipient = 'fail-h@example.com';
+
+    // We recreate createDummyJobInDb manually to inject the unique recipient
+    const batch = await batchRepo.createWithJobs(
+      {
+        userId,
+        senderId: isolatedSender.id,
+        subject: 'Failure Test',
+        body: 'Body',
+        startAt: new Date(),
+        delaySeconds: 0,
+        hourlyLimit: 100,
+        totalCount: 1,
+      },
+      [
+        {
+          senderId: isolatedSender.id,
+          sequenceNumber: 1,
+          idempotencyKey: `fail-idemp-${Date.now()}`,
+          recipient: failingRecipient,
+          subject: 'Failure Test',
+          body: 'Body',
+          scheduledAt: new Date(),
+          status: EmailJobStatus.SCHEDULED,
+        },
+      ],
+    );
+    const dbJob = (await jobRepo.findByBatchId(batch.id))[0];
+
+    // 3. Inject a scoped mock email sender that throws only for this recipient
+    const mockFailingSender = {
+      send: async (payload: any) => {
+        if (payload.to === failingRecipient) {
           throw new Error('Simulated failure during send');
         }
-        // Can't call original easily with mockImplementationOnce without capturing it,
-        // but we can just throw to simulate the error. Wait, if it's just SENT that fails,
-        // the error will be caught by the worker, which will then call updateStatus for FAILED.
-        // So this mock only affects the first call (SENT).
-        throw new Error('Simulated failure during send');
-      });
+        return { success: true, messageId: 'mock-message-id' };
+      },
+    };
+
+    // 4. Restart worker with the injected mock
+    startEmailWorker({ emailSender: mockFailingSender });
 
     try {
       await enqueueEmailJob(dbJob.id);
+      // Wait for BullMQ to process the job
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const failedJob = await jobRepo.findById(dbJob.id);
       expect(failedJob?.status).toBe(EmailJobStatus.FAILED);
       expect(failedJob?.errorMessage).toContain('Simulated failure');
     } finally {
-      spy.mockRestore();
+      // 5. Cleanup: restore the normal mock worker for subsequent tests
+      await closeEmailWorker();
+      startEmailWorker({
+        emailSender: {
+          send: async () => ({ success: true, messageId: 'mock-message-id' }),
+        },
+      });
     }
   });
 
