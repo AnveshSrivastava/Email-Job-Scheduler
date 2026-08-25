@@ -5,6 +5,12 @@ export interface User {
   avatarUrl?: string;
 }
 
+export interface Sender {
+  id: string;
+  email: string;
+  displayName?: string;
+}
+
 export interface Campaign {
   id: string;
   subject: string;

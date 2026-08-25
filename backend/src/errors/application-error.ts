@@ -3,7 +3,7 @@ export class ApplicationError extends Error {
     public readonly message: string,
     public readonly statusCode: number,
     public readonly code: string,
-    public readonly details?: any
+    public readonly details?: any,
   ) {
     super(message);
     this.name = this.constructor.name;

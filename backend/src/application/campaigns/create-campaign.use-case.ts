@@ -25,7 +25,7 @@ export class CreateCampaignUseCase {
   constructor(
     private readonly batchRepo: EmailBatchRepository,
     private readonly senderRepo: SenderRepository,
-    private readonly jobRepo: EmailJobRepository
+    private readonly jobRepo: EmailJobRepository,
   ) {}
 
   async execute(command: CreateCampaignCommand) {
@@ -56,7 +56,7 @@ export class CreateCampaignUseCase {
       // job 2: startAt + delay
       const jobDelayMs = (currentSequence - 1) * command.delaySeconds * 1000;
       const scheduledAt = new Date(command.startAt.getTime() + jobDelayMs);
-      
+
       const job = {
         senderId: command.senderId,
         sequenceNumber: currentSequence,
@@ -90,13 +90,11 @@ export class CreateCampaignUseCase {
     // Trade-off: If the process crashes exactly here, jobs remain SCHEDULED in DB
     // but not in BullMQ. In a true distributed system, an Outbox pattern is needed.
     // For this assignment, we use post-commit best-effort enqueue.
-    
+
     const createdJobs = await this.jobRepo.findByBatchId(batch.id);
 
     // Enqueue all in parallel
-    const enqueuePromises = createdJobs.map((job) => 
-      enqueueEmailJob(job.id, job.scheduledAt)
-    );
+    const enqueuePromises = createdJobs.map((job) => enqueueEmailJob(job.id, job.scheduledAt));
 
     await Promise.all(enqueuePromises);
 

@@ -74,3 +74,8 @@ User
 - **Vite & React**: A minimal SPA utilizing `react-router-dom` for routing and `axios` for API communication.
 - **Authentication Flow**: The browser requests `/api/v1/auth/google` to initiate OAuth. Once authenticated, the backend returns an `HttpOnly` JWT cookie. The frontend Axios client specifies `withCredentials: true` to seamlessly append this cookie to all subsequent API requests. The frontend maintains zero state regarding the JWT itself, delegating all token management strictly to the browser's cookie jar.
 - **Protected Routes**: The SPA conditionally renders the `/dashboard` and `/campaigns/:id` components based on the success of `/api/v1/auth/me`.
+
+## Sender Ownership (Phase 8)
+- **Data Isolation**: The `Sender` entity is tightly bound to `userId`. The backend enforces that users can only retrieve or utilize senders that belong directly to them.
+- **Use-Case Validation**: `CreateCampaignUseCase` performs an explicit authorization check (`sender.userId === command.userId`) before generating any database records. This robust backend constraint protects against ID spoofing or malicious HTTP requests attempting to execute campaigns under another user's identity.
+- **Frontend UX**: The dashboard automatically queries `GET /api/v1/senders` and presents a managed dropdown, streamlining UX while delegating true authorization to the underlying use case layer.

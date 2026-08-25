@@ -5,8 +5,8 @@ import App from './App';
 vi.mock('./api/client', () => ({
   apiClient: {
     get: vi.fn().mockRejectedValue(new Error('Unauthenticated')),
-    defaults: { baseURL: 'http://localhost:3000/api/v1' }
-  }
+    defaults: { baseURL: 'http://localhost:3000/api/v1' },
+  },
 }));
 
 describe('App', () => {

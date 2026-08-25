@@ -8,7 +8,8 @@ export const Login: React.FC<{ setUser: (u: User) => void }> = ({ setUser }) => 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiClient.get('/auth/me')
+    apiClient
+      .get('/auth/me')
       .then((res) => {
         setUser(res.data.data);
         navigate('/dashboard');
@@ -31,7 +32,7 @@ export const Login: React.FC<{ setUser: (u: User) => void }> = ({ setUser }) => 
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
         <h1 className="text-3xl font-bold text-blue-600 mb-2">ReachInbox</h1>
         <p className="text-gray-500 mb-8">Email Job Scheduler</p>
-        
+
         <button
           onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-700 font-medium hover:bg-gray-50 transition-colors shadow-sm"

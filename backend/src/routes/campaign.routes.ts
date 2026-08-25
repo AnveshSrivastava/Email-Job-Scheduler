@@ -1,5 +1,11 @@
 import { Router } from 'express';
-import { createCampaign, getCampaign, getCampaignJobs, importCampaignCsv, upload } from '../controllers/campaign.controller';
+import {
+  createCampaign,
+  getCampaign,
+  getCampaignJobs,
+  importCampaignCsv,
+  upload,
+} from '../controllers/campaign.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();

@@ -10,7 +10,9 @@ const app = createApp();
 vi.mock('google-auth-library', () => {
   return {
     OAuth2Client: vi.fn().mockImplementation(() => ({
-      generateAuthUrl: vi.fn().mockReturnValue('https://accounts.google.com/o/oauth2/v2/auth?mock=true'),
+      generateAuthUrl: vi
+        .fn()
+        .mockReturnValue('https://accounts.google.com/o/oauth2/v2/auth?mock=true'),
       getToken: vi.fn().mockResolvedValue({
         tokens: { id_token: 'mock-id-token', access_token: 'mock-access-token' },
       }),
@@ -42,20 +44,20 @@ describe('Auth API Integration Tests', () => {
 
   it('2. GET /api/v1/auth/google/callback should create user and set cookie', async () => {
     const response = await request(app).get('/api/v1/auth/google/callback?code=mock-code');
-    
+
     expect(response.status).toBe(302); // Redirects to /
     expect(response.header.location).toBe('http://localhost:5173/dashboard');
-    
+
     // Extract cookie
     const setCookie = (response.header['set-cookie'] as unknown as string[]) || [];
     expect(setCookie).toBeDefined();
-    
+
     // Find the token cookie
     const tokenCookie = setCookie.find((c: string) => c.startsWith('token='));
     expect(tokenCookie).toBeDefined();
-    
+
     authCookie = tokenCookie!.split(';')[0];
-    
+
     // Verify user was created in DB
     const user = await prisma.user.findUnique({ where: { email: 'test-google@example.com' } });
     expect(user).toBeDefined();
@@ -64,22 +66,18 @@ describe('Auth API Integration Tests', () => {
   });
 
   it('3. GET /api/v1/auth/me should return authenticated user data', async () => {
-    const response = await request(app)
-      .get('/api/v1/auth/me')
-      .set('Cookie', authCookie);
-      
+    const response = await request(app).get('/api/v1/auth/me').set('Cookie', authCookie);
+
     expect(response.status).toBe(200);
     expect(response.body.data.email).toBe('test-google@example.com');
   });
 
   it('4. POST /api/v1/auth/logout should clear cookie', async () => {
-    const response = await request(app)
-      .post('/api/v1/auth/logout')
-      .set('Cookie', authCookie);
-      
+    const response = await request(app).post('/api/v1/auth/logout').set('Cookie', authCookie);
+
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
-    
+
     const setCookie = (response.header['set-cookie'] as unknown as string[]) || [];
     const tokenCookie = setCookie.find((c: string) => c.startsWith('token='));
     expect(tokenCookie).toContain('Expires=');

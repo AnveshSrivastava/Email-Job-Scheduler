@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import { googleAuthRedirect, googleAuthCallback, getCurrentUser, logout } from '../controllers/auth.controller';
+import {
+  googleAuthRedirect,
+  googleAuthCallback,
+  getCurrentUser,
+  logout,
+} from '../controllers/auth.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();

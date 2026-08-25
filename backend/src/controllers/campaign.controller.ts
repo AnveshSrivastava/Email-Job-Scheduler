@@ -18,14 +18,19 @@ const createCampaignSchema = z.object({
   senderId: z.string().uuid('Invalid sender ID'),
   subject: z.string().min(1, 'Subject is required'),
   body: z.string().min(1, 'Body is required'),
-  startAt: z.string().datetime().transform((str) => new Date(str)),
+  startAt: z
+    .string()
+    .datetime()
+    .transform((str) => new Date(str)),
   delaySeconds: z.number().int().min(0, 'Delay must be non-negative'),
   hourlyLimit: z.number().int().positive('Hourly limit must be positive'),
-  recipients: z.array(
-    z.object({
-      email: z.string().email('Invalid email address'),
-    })
-  ).min(1, 'At least one recipient is required'),
+  recipients: z
+    .array(
+      z.object({
+        email: z.string().email('Invalid email address'),
+      }),
+    )
+    .min(1, 'At least one recipient is required'),
 });
 
 export const createCampaign = async (req: Request, res: Response, next: NextFunction) => {
@@ -39,7 +44,7 @@ export const createCampaign = async (req: Request, res: Response, next: NextFunc
     }
 
     // 3. Ensure no duplicate emails in the request array (assuming requirement)
-    const emails = parsed.data.recipients.map(r => r.email);
+    const emails = parsed.data.recipients.map((r) => r.email);
     const uniqueEmails = new Set(emails);
     if (emails.length !== uniqueEmails.size) {
       throw new ValidationError('Duplicate recipients are not allowed in the same campaign');
@@ -72,7 +77,7 @@ export const importCampaignCsv = async (req: Request, res: Response, next: NextF
     if (!req.file) {
       throw new ValidationError('CSV file is required');
     }
-    
+
     // Parse the rest of the form data
     const bodyFields = {
       senderId: req.body.senderId,
@@ -98,7 +103,7 @@ export const importCampaignCsv = async (req: Request, res: Response, next: NextF
     if (records.length === 0) {
       throw new ValidationError('CSV contains no valid rows');
     }
-    
+
     // Verify column exists
     if (!('email' in (records as any[])[0])) {
       throw new ValidationError('CSV must contain an "email" column');
@@ -116,11 +121,14 @@ export const importCampaignCsv = async (req: Request, res: Response, next: NextF
 
     const parsed = createCampaignSchema.safeParse(payloadToValidate);
     if (!parsed.success) {
-      throw new ValidationError('Invalid request payload from CSV or form data', parsed.error.format());
+      throw new ValidationError(
+        'Invalid request payload from CSV or form data',
+        parsed.error.format(),
+      );
     }
 
     // Check duplicates
-    const emails = parsed.data.recipients.map(r => r.email);
+    const emails = parsed.data.recipients.map((r) => r.email);
     const uniqueEmails = new Set(emails);
     if (emails.length !== uniqueEmails.size) {
       throw new ValidationError('Duplicate recipients in CSV');
@@ -146,7 +154,7 @@ export const getCampaign = async (req: Request, res: Response, next: NextFunctio
     if (!batch) {
       throw new ValidationError('Campaign not found'); // Should be NotFoundError, let's just use it
     }
-    
+
     if (batch.userId !== userId) {
       throw new ValidationError('Unauthorized');
     }
@@ -161,15 +169,15 @@ export const getCampaignJobs = async (req: Request, res: Response, next: NextFun
   try {
     const userId = req.user!.id;
     const { id } = req.params;
-    
+
     // Check ownership
     const batch = await batchRepo.findById(id);
     if (!batch || batch.userId !== userId) {
       throw new ValidationError('Campaign not found or unauthorized');
     }
 
-    const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string || '50', 10)));
+    const page = Math.max(1, parseInt((req.query.page as string) || '1', 10));
+    const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || '50', 10)));
     const status = req.query.status as string | undefined;
 
     const skip = (page - 1) * limit;
@@ -182,8 +190,8 @@ export const getCampaignJobs = async (req: Request, res: Response, next: NextFun
       pagination: {
         page,
         limit,
-        total
-      }
+        total,
+      },
     });
   } catch (error) {
     next(error);

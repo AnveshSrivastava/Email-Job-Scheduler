@@ -10,7 +10,7 @@ export const CampaignDetails: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -19,21 +19,22 @@ export const CampaignDetails: React.FC = () => {
       setLoading(true);
       const [batchRes, jobsRes] = await Promise.all([
         apiClient.get(`/campaigns/${id}`),
-        apiClient.get(`/campaigns/${id}/jobs?page=${page}&limit=10`)
+        apiClient.get(`/campaigns/${id}/jobs?page=${page}&limit=10`),
       ]);
       setCampaign(batchRes.data.data);
       setJobs(jobsRes.data.data);
       setTotalPages(Math.ceil(jobsRes.data.pagination.total / 10));
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorObj = err as any; setError(errorObj.response?.data?.error?.message || 'Failed to load campaign');
+      const errorObj = err as any;
+      setError(errorObj.response?.data?.error?.message || 'Failed to load campaign');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-        // eslint-disable-next-line
+    // eslint-disable-next-line
     if (id) fetchCampaign();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, page]);
@@ -46,24 +47,34 @@ export const CampaignDetails: React.FC = () => {
     return (
       <div className="bg-red-50 border-l-4 border-red-500 p-4 text-red-700">
         <p>{error || 'Campaign not found'}</p>
-        <Link to="/dashboard" className="text-red-800 underline mt-2 inline-block">Back to Dashboard</Link>
+        <Link to="/dashboard" className="text-red-800 underline mt-2 inline-block">
+          Back to Dashboard
+        </Link>
       </div>
     );
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'SENT': return <CheckCircle className="text-green-500" size={18} />;
-      case 'FAILED': return <XCircle className="text-red-500" size={18} />;
-      case 'PROCESSING': return <Clock className="text-yellow-500" size={18} />;
-      case 'SCHEDULED': return <Clock className="text-blue-500" size={18} />;
-      default: return <AlertCircle className="text-gray-400" size={18} />;
+      case 'SENT':
+        return <CheckCircle className="text-green-500" size={18} />;
+      case 'FAILED':
+        return <XCircle className="text-red-500" size={18} />;
+      case 'PROCESSING':
+        return <Clock className="text-yellow-500" size={18} />;
+      case 'SCHEDULED':
+        return <Clock className="text-blue-500" size={18} />;
+      default:
+        return <AlertCircle className="text-gray-400" size={18} />;
     }
   };
 
   return (
     <div className="max-w-5xl mx-auto">
-      <Link to="/dashboard" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6">
+      <Link
+        to="/dashboard"
+        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6"
+      >
         <ArrowLeft size={16} /> Back to Dashboard
       </Link>
 
@@ -91,10 +102,14 @@ export const CampaignDetails: React.FC = () => {
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-          <h3 className="font-bold text-lg flex items-center gap-2"><Mail size={18} /> Jobs</h3>
-          <button onClick={fetchCampaign} className="text-sm text-blue-600 hover:underline">Refresh</button>
+          <h3 className="font-bold text-lg flex items-center gap-2">
+            <Mail size={18} /> Jobs
+          </h3>
+          <button onClick={fetchCampaign} className="text-sm text-blue-600 hover:underline">
+            Refresh
+          </button>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-100 text-gray-600 uppercase">
@@ -116,33 +131,46 @@ export const CampaignDetails: React.FC = () => {
                       <span className="font-semibold">{job.status}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-gray-500">{new Date(job.scheduledAt).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-gray-500">{job.sentAt ? new Date(job.sentAt).toLocaleString() : '-'}</td>
-                  <td className="px-6 py-4 text-red-500 max-w-xs truncate" title={job.errorMessage || ''}>{job.errorMessage || '-'}</td>
+                  <td className="px-6 py-4 text-gray-500">
+                    {new Date(job.scheduledAt).toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 text-gray-500">
+                    {job.sentAt ? new Date(job.sentAt).toLocaleString() : '-'}
+                  </td>
+                  <td
+                    className="px-6 py-4 text-red-500 max-w-xs truncate"
+                    title={job.errorMessage || ''}
+                  >
+                    {job.errorMessage || '-'}
+                  </td>
                 </tr>
               ))}
               {jobs.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No jobs found.</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                    No jobs found.
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        
+
         {totalPages > 1 && (
           <div className="px-6 py-4 border-t flex justify-between items-center bg-gray-50">
-            <button 
-              disabled={page === 1} 
-              onClick={() => setPage(p => p - 1)}
+            <button
+              disabled={page === 1}
+              onClick={() => setPage((p) => p - 1)}
               className="px-4 py-2 border rounded bg-white disabled:opacity-50"
             >
               Previous
             </button>
-            <span className="text-gray-600">Page {page} of {totalPages}</span>
-            <button 
-              disabled={page === totalPages} 
-              onClick={() => setPage(p => p + 1)}
+            <span className="text-gray-600">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              disabled={page === totalPages}
+              onClick={() => setPage((p) => p + 1)}
               className="px-4 py-2 border rounded bg-white disabled:opacity-50"
             >
               Next

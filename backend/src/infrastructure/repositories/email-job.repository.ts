@@ -24,7 +24,12 @@ export class EmailJobRepository {
     });
   }
 
-  async findPaginatedByBatchId(batchId: string, page: number, limit: number, status?: EmailJobStatus) {
+  async findPaginatedByBatchId(
+    batchId: string,
+    page: number,
+    limit: number,
+    status?: EmailJobStatus,
+  ) {
     const skip = (page - 1) * limit;
     const where = { batchId, ...(status ? { status } : {}) };
 
@@ -34,8 +39,8 @@ export class EmailJobRepository {
         where,
         skip,
         take: limit,
-        orderBy: { sequenceNumber: 'asc' }
-      })
+        orderBy: { sequenceNumber: 'asc' },
+      }),
     ]);
 
     return { total, jobs };
@@ -52,7 +57,9 @@ export class EmailJobRepository {
   async updateStatus(
     id: string,
     status: EmailJobStatus,
-    extra: Partial<Pick<EmailJob, 'sentAt' | 'failedAt' | 'errorMessage' | 'providerMessageId'>> = {},
+    extra: Partial<
+      Pick<EmailJob, 'sentAt' | 'failedAt' | 'errorMessage' | 'providerMessageId'>
+    > = {},
   ): Promise<EmailJob> {
     return this.prisma.emailJob.update({
       where: { id },

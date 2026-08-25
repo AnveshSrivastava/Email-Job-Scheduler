@@ -8,7 +8,7 @@ import { UnauthorizedError } from '../errors/application-error';
 const oauth2Client = new OAuth2Client(
   config.GOOGLE_CLIENT_ID,
   config.GOOGLE_CLIENT_SECRET,
-  config.GOOGLE_CALLBACK_URL
+  config.GOOGLE_CALLBACK_URL,
 );
 
 export const googleAuthRedirect = (req: Request, res: Response) => {
@@ -34,7 +34,7 @@ export const googleAuthCallback = async (req: Request, res: Response, next: Next
       idToken: tokens.id_token!,
       audience: config.GOOGLE_CLIENT_ID,
     });
-    
+
     const payload = ticket.getPayload();
     if (!payload || !payload.email) {
       throw new UnauthorizedError('Failed to retrieve user info from Google');

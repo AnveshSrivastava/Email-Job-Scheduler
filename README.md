@@ -130,3 +130,7 @@ See `docs/architecture.md` for engineering design decisions.
 ## Git Workflow
 Ensure all code passes `npm run typecheck`, `npm run lint`, and `npm run test` before committing.
 # Email-Job-Scheduler
+
+### Sender Management Endpoints
+* `GET /senders` - List senders belonging to the authenticated user.
+* `POST /senders` - Create a new sender identity.
