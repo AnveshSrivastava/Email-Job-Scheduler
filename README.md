@@ -32,6 +32,12 @@ A production-oriented full-stack email scheduling system for an SDE internship a
 ## Environment Variables
 See `.env.example` for the required configuration. Do not commit actual secrets to the repository.
 
+## Database
+The project uses PostgreSQL as the primary data store and source of truth, managed via Prisma ORM. 
+- Local development requires the Docker Compose PostgreSQL instance.
+- Run `npx prisma migrate dev` in the `/backend` directory to apply schema changes.
+- The schema is located at `/backend/prisma/schema.prisma`.
+
 ## Development Commands
 *   `npm run dev` - Run development servers for all workspaces
 *   `npm run build` - Build all workspaces
@@ -41,8 +47,20 @@ See `.env.example` for the required configuration. Do not commit actual secrets 
 *   `npm run format` - Format code with Prettier
 *   `npm run format:check` - Check formatting
 
+## Domain Model
+- **User**: Represents a system user (future Google OAuth identity). Owns senders and batches.
+- **Sender**: Represents an SMTP sending identity/configuration associated with a User.
+- **EmailBatch**: Represents one scheduling/import operation created by a User, referencing a Sender.
+- **EmailJob**: Represents exactly ONE recipient email that should eventually be sent. Owned by a Batch.
+
+## Data Ownership
+A User owns Senders and Batches. An EmailBatch owns EmailJobs. The EmailJob is the fundamental unit of work representing one send operation to one recipient.
+
+## Persistence Guarantees
+PostgreSQL is the authoritative source of email state. The database guarantees uniqueness of user emails, idempotency keys for jobs, and strict sequence ordering within a batch. It survives process and queue restarts. Note: Database idempotency alone does not guarantee no duplicate SMTP delivery in a distributed environment (this will be addressed in the worker phase).
+
 ## Current Project Status
-**Phase 1**: Infrastructure & tooling setup. Application features (scheduling, database models, etc.) are implemented incrementally in later phases.
+**Phase 2**: Persistence layer & Domain Model complete. Scheduler and worker logic are planned for future phases.
 
 ## Testing
 Run `npm run test` from the root to execute all workspace tests.

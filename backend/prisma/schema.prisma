@@ -6,3 +6,88 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id        String   @id @default(uuid())
+  googleId  String?  @unique
+  email     String   @unique
+  name      String
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  senders   Sender[]
+  batches   EmailBatch[]
+}
+
+model Sender {
+  id           String   @id @default(uuid())
+  userId       String
+  email        String
+  displayName  String?
+  smtpUsername String?
+  smtpPassword String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batches      EmailBatch[]
+  jobs         EmailJob[]
+
+  @@unique([userId, email])
+}
+
+model EmailBatch {
+  id           String   @id @default(uuid())
+  userId       String
+  senderId     String
+  subject      String
+  body         String
+  startAt      DateTime
+  delaySeconds Int
+  hourlyLimit  Int
+  totalCount   Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sender       Sender     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  jobs         EmailJob[]
+}
+
+enum EmailJobStatus {
+  PENDING
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+}
+
+model EmailJob {
+  id                String         @id @default(uuid())
+  batchId           String
+  senderId          String
+  sequenceNumber    Int
+  idempotencyKey    String         @unique
+  recipient         String
+  subject           String
+  body              String
+  scheduledAt       DateTime
+  status            EmailJobStatus @default(PENDING)
+  sentAt            DateTime?
+  failedAt          DateTime?
+  errorMessage      String?
+  attempts          Int            @default(0)
+  providerMessageId String?
+  bullJobId         String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  batch             EmailBatch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sender            Sender         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, sequenceNumber])
+  @@index([status, scheduledAt])
+  @@index([batchId])
+  @@index([senderId])
+}
