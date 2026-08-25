@@ -52,7 +52,7 @@ export class EmailJobRepository {
   async updateStatus(
     id: string,
     status: EmailJobStatus,
-    extra: Partial<Pick<EmailJob, 'sentAt' | 'failedAt' | 'errorMessage'>> = {},
+    extra: Partial<Pick<EmailJob, 'sentAt' | 'failedAt' | 'errorMessage' | 'providerMessageId'>> = {},
   ): Promise<EmailJob> {
     return this.prisma.emailJob.update({
       where: { id },

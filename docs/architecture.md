@@ -27,7 +27,7 @@ Establish a boring, predictable, reproducible foundation for a full-stack email 
 *   Authentication (Google OAuth, JWT HttpOnly cookies)
 
 ### PLANNED
-*   Frontend dashboard
+*   Frontend dashboard (Implemented)
 
 ## Domain Model (Phase 2)
 The data model uses PostgreSQL as the absolute source of truth. Redis/BullMQ will strictly be used as an execution mechanism in later phases.
@@ -69,3 +69,8 @@ User
 - **JWT Storage**: Upon callback, the API creates or looks up the user, issues a JWT, and securely sets it as an `HttpOnly`, `SameSite=Lax` cookie.
 - **Middleware Boundary**: The `authMiddleware` intercepts all protected routes, verifies the JWT, and attaches the trusted identity to `req.user.id`. The legacy `x-user-id` header is strictly ignored by production routes, ensuring robust zero-trust boundary handling at the Express layer.
 - **Business Layer Independence**: The `CreateCampaignUseCase` continues to receive only a trusted `userId` parameter, entirely decoupled from the HTTP transport and authentication mechanics.
+
+## Frontend Architecture (Phase 7)
+- **Vite & React**: A minimal SPA utilizing `react-router-dom` for routing and `axios` for API communication.
+- **Authentication Flow**: The browser requests `/api/v1/auth/google` to initiate OAuth. Once authenticated, the backend returns an `HttpOnly` JWT cookie. The frontend Axios client specifies `withCredentials: true` to seamlessly append this cookie to all subsequent API requests. The frontend maintains zero state regarding the JWT itself, delegating all token management strictly to the browser's cookie jar.
+- **Protected Routes**: The SPA conditionally renders the `/dashboard` and `/campaigns/:id` components based on the success of `/api/v1/auth/me`.

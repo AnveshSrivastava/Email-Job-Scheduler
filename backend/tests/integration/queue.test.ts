@@ -53,7 +53,7 @@ describe('Queue & Worker Integration Tests', () => {
 
   const createDummyJobInDb = async (
     scheduledAt: Date = new Date(),
-    status = EmailJobStatus.SCHEDULED,
+    status: import('@prisma/client').EmailJobStatus = EmailJobStatus.SCHEDULED,
   ) => {
     const batch = await batchRepo.createWithJobs(
       {

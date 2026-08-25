@@ -77,8 +77,8 @@ export const googleAuthCallback = async (req: Request, res: Response, next: Next
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    // Redirect to frontend dashboard (mocked as / for now)
-    res.redirect('/');
+    // Redirect to frontend dashboard
+    res.redirect(`${config.FRONTEND_URL}/dashboard`);
   } catch (error) {
     next(error);
   }

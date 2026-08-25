@@ -100,7 +100,7 @@ export const importCampaignCsv = async (req: Request, res: Response, next: NextF
     }
     
     // Verify column exists
-    if (!('email' in records[0])) {
+    if (!('email' in (records as any[])[0])) {
       throw new ValidationError('CSV must contain an "email" column');
     }
 

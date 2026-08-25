@@ -44,17 +44,17 @@ describe('Auth API Integration Tests', () => {
     const response = await request(app).get('/api/v1/auth/google/callback?code=mock-code');
     
     expect(response.status).toBe(302); // Redirects to /
-    expect(response.header.location).toBe('/');
+    expect(response.header.location).toBe('http://localhost:5173/dashboard');
     
     // Extract cookie
-    const setCookie = response.header['set-cookie'];
+    const setCookie = (response.header['set-cookie'] as unknown as string[]) || [];
     expect(setCookie).toBeDefined();
     
     // Find the token cookie
     const tokenCookie = setCookie.find((c: string) => c.startsWith('token='));
     expect(tokenCookie).toBeDefined();
     
-    authCookie = tokenCookie.split(';')[0];
+    authCookie = tokenCookie!.split(';')[0];
     
     // Verify user was created in DB
     const user = await prisma.user.findUnique({ where: { email: 'test-google@example.com' } });
@@ -80,7 +80,7 @@ describe('Auth API Integration Tests', () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     
-    const setCookie = response.header['set-cookie'];
+    const setCookie = (response.header['set-cookie'] as unknown as string[]) || [];
     const tokenCookie = setCookie.find((c: string) => c.startsWith('token='));
     expect(tokenCookie).toContain('Expires=');
   });

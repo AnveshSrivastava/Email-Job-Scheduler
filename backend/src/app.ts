@@ -1,13 +1,19 @@
 import express, { Express } from 'express';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 import healthRoutes from './routes/health.routes';
 import campaignRoutes from './routes/campaign.routes';
 import authRoutes from './routes/auth.routes';
+import { config } from './config/env';
 
 export const createApp = (): Express => {
   const app = express();
 
   // Middleware
+  app.use(cors({
+    origin: config.FRONTEND_URL,
+    credentials: true,
+  }));
   app.use(express.json());
   app.use(cookieParser());
 

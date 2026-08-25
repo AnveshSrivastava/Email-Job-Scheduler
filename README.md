@@ -74,7 +74,7 @@ PostgreSQL is the authoritative source of email state. The database guarantees u
 - **Environment Variables**: Use `.env.example` to set up `DATABASE_URL` and `REDIS_URL`. Ethereal SMTP credentials should be filled in for `SMTP_USER` and `SMTP_PASSWORD`.
 
 ## Current Project Status
-**Phase 6**: Google OAuth and HttpOnly JWT authentication implemented. APIs are securely protected via middleware. The `x-user-id` header is no longer trusted.
+**Phase 7**: React/Vite Frontend implemented. Full authentication flow and campaign dashboard connected. Use `npm run dev` to start both the backend API and the frontend dashboard.
 
 ## API Overview
 ### Base URL

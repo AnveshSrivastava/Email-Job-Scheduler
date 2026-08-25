@@ -8,6 +8,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().transform(Number).default('3000'),
+  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
   DATABASE_URL: z.string().optional(),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   WORKER_CONCURRENCY: z.string().transform(Number).default('5'),
