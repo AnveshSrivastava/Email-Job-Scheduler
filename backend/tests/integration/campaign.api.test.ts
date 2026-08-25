@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app';
 import { PrismaClient } from '@prisma/client';
 import { UserRepository } from '../../src/infrastructure/repositories/user.repository';
 import { SenderRepository } from '../../src/infrastructure/repositories/sender.repository';
 import { closeEmailQueue } from '../../src/infrastructure/queue/email.queue';
 import { closeEmailWorker } from '../../src/infrastructure/queue/email.worker';
+import { config } from '../../src/config/env';
 
 const prisma = new PrismaClient();
 const app = createApp();
@@ -13,9 +15,11 @@ const app = createApp();
 describe('Campaign API Integration Tests', () => {
   let userId1: string;
   let senderId1: string;
+  let authCookie1: string;
   
   let userId2: string;
   let senderId2: string;
+  let authCookie2: string;
 
   beforeAll(async () => {
     const userRepo = new UserRepository(prisma);
@@ -48,6 +52,13 @@ describe('Campaign API Integration Tests', () => {
       displayName: 'Sender 2',
     });
     senderId2 = sender2.id;
+    
+    // Generate Auth Cookies
+    const token1 = jwt.sign({ userId: userId1 }, config.JWT_SECRET);
+    authCookie1 = `token=${token1}`;
+    
+    const token2 = jwt.sign({ userId: userId2 }, config.JWT_SECRET);
+    authCookie2 = `token=${token2}`;
   });
 
   afterAll(async () => {
@@ -73,7 +84,7 @@ describe('Campaign API Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/v1/campaigns')
-        .set('x-user-id', userId1)
+        .set('Cookie', authCookie1)
         .send(payload);
 
       expect(response.status).toBe(201);
@@ -108,7 +119,7 @@ describe('Campaign API Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/v1/campaigns')
-        .set('x-user-id', userId2) // Trying to use User 1's sender
+        .set('Cookie', authCookie2) // Trying to use User 1's sender
         .send(payload);
 
       expect(response.status).toBe(403);
@@ -128,14 +139,32 @@ describe('Campaign API Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/v1/campaigns')
-        .set('x-user-id', userId1)
+        .set('Cookie', authCookie1)
         .send(payload);
 
       expect(response.status).toBe(400);
       expect(response.body.error.message).toContain('Duplicate recipients');
     });
 
-    it('4. should reject malformed payload', async () => {
+    it('4. should reject unauthenticated requests', async () => {
+      const payload = {
+        senderId: senderId1,
+        subject: 'Test',
+        body: 'Hello',
+        startAt: new Date().toISOString(),
+        delaySeconds: 0,
+        hourlyLimit: 10,
+        recipients: [{ email: 'test@example.com' }],
+      };
+
+      const response = await request(app)
+        .post('/api/v1/campaigns')
+        .send(payload); // No auth cookie
+
+      expect(response.status).toBe(401);
+    });
+
+    it('4b. should reject malformed payload', async () => {
       const payload = {
         senderId: senderId1,
         // missing subject, body
@@ -145,7 +174,7 @@ describe('Campaign API Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/v1/campaigns')
-        .set('x-user-id', userId1)
+        .set('Cookie', authCookie1)
         .send(payload);
 
       expect(response.status).toBe(400);
@@ -159,7 +188,7 @@ describe('Campaign API Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/v1/campaigns/import')
-        .set('x-user-id', userId1)
+        .set('Cookie', authCookie1)
         .field('senderId', senderId1)
         .field('subject', 'CSV Campaign')
         .field('body', 'Hello from CSV')
@@ -177,7 +206,7 @@ describe('Campaign API Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/v1/campaigns/import')
-        .set('x-user-id', userId1)
+        .set('Cookie', authCookie1)
         .field('senderId', senderId1)
         .field('subject', 'CSV')
         .field('body', 'Body')
@@ -206,7 +235,7 @@ describe('Campaign API Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/v1/campaigns')
-        .set('x-user-id', userId1)
+        .set('Cookie', authCookie1)
         .send(payload);
 
       testBatchId = response.body.data.batchId;
@@ -215,7 +244,7 @@ describe('Campaign API Integration Tests', () => {
     it('7. should retrieve campaign metadata', async () => {
       const response = await request(app)
         .get(`/api/v1/campaigns/${testBatchId}`)
-        .set('x-user-id', userId1);
+        .set('Cookie', authCookie1);
 
       expect(response.status).toBe(200);
       expect(response.body.data.subject).toBe('Retrieve Me');
@@ -224,7 +253,7 @@ describe('Campaign API Integration Tests', () => {
     it('8. should retrieve paginated jobs', async () => {
       const response = await request(app)
         .get(`/api/v1/campaigns/${testBatchId}/jobs?page=1&limit=1`)
-        .set('x-user-id', userId1);
+        .set('Cookie', authCookie1);
 
       expect(response.status).toBe(200);
       expect(response.body.data.length).toBe(1);
@@ -234,6 +263,7 @@ describe('Campaign API Integration Tests', () => {
   describe('End-to-End System Test', () => {
     let e2eUserId: string;
     let e2eSenderId: string;
+    let e2eAuthCookie: string;
 
     beforeAll(async () => {
       const userRepo = new UserRepository(prisma);
@@ -251,6 +281,9 @@ describe('Campaign API Integration Tests', () => {
         displayName: 'E2E Sender',
       });
       e2eSenderId = sender.id;
+      
+      const token = jwt.sign({ userId: e2eUserId }, config.JWT_SECRET);
+      e2eAuthCookie = `token=${token}`;
     });
 
     it('9. should handle full lifecycle from API to Worker successfully', async () => {
@@ -281,7 +314,7 @@ describe('Campaign API Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/v1/campaigns')
-        .set('x-user-id', e2eUserId)
+        .set('Cookie', e2eAuthCookie)
         .send(payload);
 
       expect(response.status).toBe(201);

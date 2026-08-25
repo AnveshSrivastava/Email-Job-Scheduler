@@ -24,9 +24,9 @@ Establish a boring, predictable, reproducible foundation for a full-stack email 
 *   Minimum delay enforcement (Redis Atomic)
 *   SMTP Delivery (Nodemailer / Ethereal SMTP)
 *   Email scheduling API (Campaign creation, JSON, CSV ingestion)
+*   Authentication (Google OAuth, JWT HttpOnly cookies)
 
 ### PLANNED
-*   Authentication (Google OAuth)
 *   Frontend dashboard
 
 ## Domain Model (Phase 2)
@@ -63,3 +63,9 @@ User
 - **HTTP API to Queue**: When a user creates a campaign, the HTTP controller forwards the request to the `CreateCampaignUseCase`.
 - **Transaction Boundary**: The use case atomically creates the `EmailBatch` and all constituent `EmailJob` records in PostgreSQL within a single Prisma transaction, marking them as `SCHEDULED`.
 - **Consistency Trade-off (Post-Commit Enqueue)**: Due to the 48-hour assignment limitation, we chose a simple post-commit best-effort enqueue rather than a full transactional outbox pattern. This means if the API process crashes *exactly* after the DB transaction commits but *before* jobs are sent to BullMQ, the jobs will remain stuck in the `SCHEDULED` state. While a true distributed system would require an outbox table and a sweeper, the current design favors architectural simplicity and limits surface area. This behavior was explicitly chosen over a cron sweeper.
+
+## Authentication (Phase 6)
+- **Google OAuth**: Users authenticate via `/api/v1/auth/google` which redirects to Google consent.
+- **JWT Storage**: Upon callback, the API creates or looks up the user, issues a JWT, and securely sets it as an `HttpOnly`, `SameSite=Lax` cookie.
+- **Middleware Boundary**: The `authMiddleware` intercepts all protected routes, verifies the JWT, and attaches the trusted identity to `req.user.id`. The legacy `x-user-id` header is strictly ignored by production routes, ensuring robust zero-trust boundary handling at the Express layer.
+- **Business Layer Independence**: The `CreateCampaignUseCase` continues to receive only a trusted `userId` parameter, entirely decoupled from the HTTP transport and authentication mechanics.

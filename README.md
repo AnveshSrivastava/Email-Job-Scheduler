@@ -74,13 +74,19 @@ PostgreSQL is the authoritative source of email state. The database guarantees u
 - **Environment Variables**: Use `.env.example` to set up `DATABASE_URL` and `REDIS_URL`. Ethereal SMTP credentials should be filled in for `SMTP_USER` and `SMTP_PASSWORD`.
 
 ## Current Project Status
-**Phase 5**: Complete Campaign Scheduling & Ingestion API implemented. Supports JSON and CSV uploads.
+**Phase 6**: Google OAuth and HttpOnly JWT authentication implemented. APIs are securely protected via middleware. The `x-user-id` header is no longer trusted.
 
 ## API Overview
 ### Base URL
 `http://localhost:3000/api/v1`
 
-### Endpoints
+### Authentication Endpoints
+* `GET /auth/google` - Redirects to Google OAuth.
+* `GET /auth/google/callback` - OAuth callback (returns HttpOnly JWT cookie).
+* `GET /auth/me` - Get current authenticated user.
+* `POST /auth/logout` - Clear JWT cookie.
+
+### Protected Endpoints (Requires HttpOnly JWT Cookie)
 * `POST /campaigns` - Create a new email campaign (JSON).
 * `POST /campaigns/import` - Create a campaign via CSV upload (multipart/form-data).
 * `GET /campaigns/:id` - Retrieve campaign metadata.
@@ -90,7 +96,7 @@ PostgreSQL is the authoritative source of email state. The database guarantees u
 ```bash
 curl -X POST http://localhost:3000/api/v1/campaigns \\
   -H "Content-Type: application/json" \\
-  -H "x-user-id: <user-uuid>" \\
+  --cookie "token=<jwt_token>" \\
   -d '{
     "senderId": "<sender-uuid>",
     "subject": "Hello",
@@ -105,7 +111,7 @@ curl -X POST http://localhost:3000/api/v1/campaigns \\
 ### Example: CSV Import
 ```bash
 curl -X POST http://localhost:3000/api/v1/campaigns/import \\
-  -H "x-user-id: <user-uuid>" \\
+  --cookie "token=<jwt_token>" \\
   -F "senderId=<sender-uuid>" \\
   -F "subject=Hello CSV" \\
   -F "body=World" \\

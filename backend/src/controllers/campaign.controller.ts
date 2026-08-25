@@ -30,12 +30,7 @@ const createCampaignSchema = z.object({
 
 export const createCampaign = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 1. Temporary Authentication mapping (for Phase 5 before OAuth)
-    // In a real app, this comes from req.user
-    const userId = req.headers['x-user-id'] as string;
-    if (!userId) {
-      throw new ValidationError('x-user-id header is required for authentication', null);
-    }
+    const userId = req.user!.id;
 
     // 2. Validate payload
     const parsed = createCampaignSchema.safeParse(req.body);
@@ -72,10 +67,7 @@ export const upload = multer({
 
 export const importCampaignCsv = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
-    if (!userId) {
-      throw new ValidationError('x-user-id header is required for authentication', null);
-    }
+    const userId = req.user!.id;
 
     if (!req.file) {
       throw new ValidationError('CSV file is required');
@@ -147,7 +139,7 @@ export const importCampaignCsv = async (req: Request, res: Response, next: NextF
 
 export const getCampaign = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = req.user!.id;
     const { id } = req.params;
 
     const batch = await batchRepo.findById(id);
@@ -167,7 +159,7 @@ export const getCampaign = async (req: Request, res: Response, next: NextFunctio
 
 export const getCampaignJobs = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = req.user!.id;
     const { id } = req.params;
     
     // Check ownership

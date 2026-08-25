@@ -17,16 +17,21 @@
   "dependencies": {
     "@prisma/client": "^6.4.1",
     "bullmq": "^6.2.1",
+    "cookie-parser": "^1.4.7",
     "csv-parse": "^7.0.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "google-auth-library": "^11.0.2",
     "ioredis": "^6.0.0",
+    "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",
     "nodemailer": "^9.0.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.2.0",
     "@types/node": "^24.12.3",
     "@types/nodemailer": "^8.0.1",

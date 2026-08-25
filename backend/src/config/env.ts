@@ -22,6 +22,12 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().default('ReachInbox Scheduler <test@reachinbox.test>'),
+
+  // Auth
+  JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
+  GOOGLE_CLIENT_ID: z.string().min(1, 'GOOGLE_CLIENT_ID is required'),
+  GOOGLE_CLIENT_SECRET: z.string().min(1, 'GOOGLE_CLIENT_SECRET is required'),
+  GOOGLE_CALLBACK_URL: z.string().url('GOOGLE_CALLBACK_URL must be a valid URL'),
 });
 
 const _env = envSchema.safeParse(process.env);

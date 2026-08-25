@@ -1,15 +1,19 @@
 import express, { Express } from 'express';
+import cookieParser from 'cookie-parser';
 import healthRoutes from './routes/health.routes';
 import campaignRoutes from './routes/campaign.routes';
+import authRoutes from './routes/auth.routes';
 
 export const createApp = (): Express => {
   const app = express();
 
   // Middleware
   app.use(express.json());
+  app.use(cookieParser());
 
   // Routes
   app.use('/health', healthRoutes);
+  app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/campaigns', campaignRoutes);
 
   // Global Error Handler
