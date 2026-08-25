@@ -1,6 +1,6 @@
 // eslint.config.js
 module.exports = [
   {
-    ignores: ["dist/**", "node_modules/**"]
-  }
+    ignores: ['dist/**', 'node_modules/**'],
+  },
 ];
