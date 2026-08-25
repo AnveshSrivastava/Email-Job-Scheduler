@@ -11,6 +11,17 @@ const envSchema = z.object({
   DATABASE_URL: z.string().optional(),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   WORKER_CONCURRENCY: z.string().transform(Number).default('5'),
+  MIN_EMAIL_DELAY_MS: z.string().transform(Number).default('2000'),
+  MAX_EMAILS_PER_HOUR_PER_SENDER: z.string().transform(Number).default('100'),
+  SMTP_HOST: z.string().default('smtp.ethereal.email'),
+  SMTP_PORT: z.string().transform(Number).default('587'),
+  SMTP_SECURE: z
+    .string()
+    .transform((val) => val === 'true')
+    .default('false'),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().default('ReachInbox Scheduler <test@reachinbox.test>'),
 });
 
 const _env = envSchema.safeParse(process.env);

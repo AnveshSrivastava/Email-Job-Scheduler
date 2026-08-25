@@ -96,8 +96,16 @@ describe('Queue & Worker Integration Tests', () => {
     const jobId = await enqueueEmailJob(dbJob.id);
     expect(jobId).toBe(dbJob.id);
 
-    // Start Worker
-    startEmailWorker();
+    // Mock SMTP Client
+    const mockEmailSender = {
+      send: async (payload: any) => ({
+        success: true,
+        messageId: 'mock-message-id',
+      }),
+    };
+
+    // Start Worker with mocked sender
+    startEmailWorker({ emailSender: mockEmailSender });
 
     // Wait a bit for processing
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -106,6 +114,7 @@ describe('Queue & Worker Integration Tests', () => {
     const processedJob = await jobRepo.findById(dbJob.id);
     expect(processedJob?.status).toBe(EmailJobStatus.SENT);
     expect(processedJob?.sentAt).toBeDefined();
+    expect(processedJob?.providerMessageId).toBe('mock-message-id');
   });
 
   it('D. Delayed job enqueue', async () => {
@@ -202,5 +211,51 @@ describe('Queue & Worker Integration Tests', () => {
     expect(bullJob?.id).toBe(dbJob.id);
     const state = await bullJob?.getState();
     expect(state).toBe('delayed');
+  });
+
+  describe('Rate Limiter Service Tests', () => {
+    it('K. Minimum delay enforcement', async () => {
+      const { EmailRateLimiter } =
+        await import('../../src/infrastructure/rate-limit/email.rate-limiter');
+      const rateLimiter = new EmailRateLimiter();
+      const testSenderId = `sender-delay-${Date.now()}`;
+
+      const now = new Date('2026-08-25T20:00:00.000Z');
+
+      // First attempt: should succeed
+      const res1 = await rateLimiter.reserveSendSlot(testSenderId, now, 100, 2000);
+      expect(res1.allowed).toBe(true);
+      expect(res1.nextAllowedTimeMs).toBe(now.getTime() + 2000);
+
+      // Second attempt immediately: should fail due to min delay
+      const res2 = await rateLimiter.reserveSendSlot(testSenderId, now, 100, 2000);
+      expect(res2.allowed).toBe(false);
+      expect(res2.nextAllowedTimeMs).toBe(now.getTime() + 2000);
+
+      // Third attempt 2 seconds later: should succeed
+      const later = new Date(now.getTime() + 2000);
+      const res3 = await rateLimiter.reserveSendSlot(testSenderId, later, 100, 2000);
+      expect(res3.allowed).toBe(true);
+    });
+
+    it('L. Hourly capacity enforcement', async () => {
+      const { EmailRateLimiter } =
+        await import('../../src/infrastructure/rate-limit/email.rate-limiter');
+      const rateLimiter = new EmailRateLimiter();
+      const testSenderId = `sender-cap-${Date.now()}`;
+
+      const now = new Date('2026-08-25T20:00:00.000Z');
+
+      // Exhaust capacity (limit=2)
+      await rateLimiter.reserveSendSlot(testSenderId, now, 2, 0); // 1st
+      await rateLimiter.reserveSendSlot(testSenderId, now, 2, 0); // 2nd
+
+      // 3rd should fail capacity
+      const res3 = await rateLimiter.reserveSendSlot(testSenderId, now, 2, 0);
+      expect(res3.allowed).toBe(false);
+      // nextAllowedTimeMs should be the start of the next hour
+      const nextHourMs = new Date('2026-08-25T21:00:00.000Z').getTime();
+      expect(res3.nextAllowedTimeMs).toBe(nextHourMs);
+    });
   });
 });

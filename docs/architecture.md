@@ -20,11 +20,13 @@ Establish a boring, predictable, reproducible foundation for a full-stack email 
 *   Database persistence layers (Repositories)
 *   BullMQ worker architecture (Queue, Redis)
 *   Worker-level restart/idempotency behavior
+*   Distributed throttling & rate limiting (Redis Lua script)
+*   Minimum delay enforcement (Redis Atomic)
+*   SMTP Delivery (Nodemailer / Ethereal SMTP)
 
 ### PLANNED
 *   Authentication (Google OAuth)
 *   Email scheduling API
-*   Distributed throttling & rate limiting
 *   Frontend dashboard
 
 ## Domain Model (Phase 2)

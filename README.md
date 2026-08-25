@@ -59,20 +59,22 @@ A User owns Senders and Batches. An EmailBatch owns EmailJobs. The EmailJob is t
 ## Persistence Guarantees
 PostgreSQL is the authoritative source of email state. The database guarantees uniqueness of user emails, idempotency keys for jobs, and strict sequence ordering within a batch. It survives process and queue restarts. Note: Database idempotency alone does not guarantee no duplicate SMTP delivery in a distributed environment (this will be addressed in the worker phase).
 
-## Queue & Worker Architecture (Phase 3)
+## Queue & Worker Architecture (Phase 3 & 4)
 - **BullMQ**: Acts as the scheduling and queue layer. Jobs are enqueued containing only the `emailJobId`.
-- **Redis**: Provides persistence for BullMQ, storing the delayed jobs and active queues.
+- **Redis**: Provides persistence for BullMQ, storing the delayed jobs and active queues. Also serves as the atomic distributed lock and rate limiter storage.
 - **Worker**: Consumes jobs, claims them atomically in PostgreSQL to ensure single execution, processes them, and records the `SENT` or `FAILED` state back to the database.
-- **Delayed Jobs**: Scheduled jobs calculate their delay and wait in Redis natively without polling schedulers.
+- **Delayed Jobs**: Scheduled jobs calculate their delay and wait in BullMQ natively without polling schedulers.
 - **Worker Concurrency**: Configured via the `WORKER_CONCURRENCY` environment variable.
+- **Distributed Throttling**: A custom Redis Lua script enforces both a global `MIN_EMAIL_DELAY_MS` and a strict `MAX_EMAILS_PER_HOUR_PER_SENDER` capacity window atomically. If limits are reached, jobs are rescheduled seamlessly back into the BullMQ delayed queue.
+- **SMTP Delivery**: Uses `nodemailer` to process actual job delivery. It pulls credentials from environment variables (`SMTP_HOST`, `SMTP_USER`, etc.) to interface cleanly with Ethereal SMTP.
 - **Idempotent Processing**: Workers verify job status before proceeding. If a job is already `SENT` or cannot be atomically transitioned from `SCHEDULED` to `PROCESSING`, it is safely ignored.
 
 ## Local Infrastructure
 - **Starting Services**: Run `docker compose up -d` to start PostgreSQL and Redis.
-- **Environment Variables**: Use `.env.example` to set up `DATABASE_URL` and `REDIS_URL`.
+- **Environment Variables**: Use `.env.example` to set up `DATABASE_URL` and `REDIS_URL`. Ethereal SMTP credentials should be filled in for `SMTP_USER` and `SMTP_PASSWORD`.
 
 ## Current Project Status
-**Phase 3**: Queue infrastructure and BullMQ worker foundation implemented. Ready for application/API layer.
+**Phase 4**: Queue infrastructure, Ethereal SMTP delivery, and distributed throttling implemented. Ready for application/API layer.
 
 ## Testing
 Run `npm run test` from the root to execute all workspace tests.

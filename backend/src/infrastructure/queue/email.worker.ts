@@ -1,17 +1,32 @@
-import { Worker, Job } from 'bullmq';
+import { Worker, Job, DelayedError } from 'bullmq';
 import { getRedisConnection } from './queue.connection';
 import { EMAIL_QUEUE_NAME, EmailQueueJobPayload } from './email.job.types';
 import { EmailJobRepository } from '../repositories/email-job.repository';
+import { SenderRepository } from '../repositories/sender.repository';
+import { EmailRateLimiter } from '../rate-limit/email.rate-limiter';
+import { SmtpClient } from '../email/smtp.client';
 import { EmailJobStatus } from '@prisma/client';
 import { config } from '../../config/env';
 import { prisma } from '../database/prisma';
 
+import { IEmailSender } from '../email/email.types';
+
 let worker: Worker<EmailQueueJobPayload, void, string> | null = null;
 let workerRedisClient: ReturnType<typeof getRedisConnection> | null = null;
-const emailJobRepo = new EmailJobRepository(prisma);
 
-export const startEmailWorker = () => {
+const emailJobRepo = new EmailJobRepository(prisma);
+const senderRepo = new SenderRepository(prisma);
+
+interface WorkerDependencies {
+  emailSender?: IEmailSender;
+  rateLimiter?: EmailRateLimiter;
+}
+
+export const startEmailWorker = (deps: WorkerDependencies = {}) => {
   if (worker) return worker;
+
+  const rateLimiter = deps.rateLimiter || new EmailRateLimiter();
+  const smtpClient = deps.emailSender || new SmtpClient();
 
   workerRedisClient = getRedisConnection();
 
@@ -20,14 +35,12 @@ export const startEmailWorker = () => {
     async (job: Job<EmailQueueJobPayload>) => {
       const { emailJobId } = job.data;
 
-      // 1. Validate job exists
       const dbJob = await emailJobRepo.findById(emailJobId);
       if (!dbJob) {
-        console.warn(`Job ${emailJobId} not found in database. Skipping.`);
-        return; // Treated as success to remove from queue
+        console.warn(`Job ${emailJobId} not found in DB. Skipping.`);
+        return;
       }
 
-      // 2. Check idempotent success
       if (dbJob.status === EmailJobStatus.SENT) {
         console.log(`Job ${emailJobId} already SENT. Skipping.`);
         return;
@@ -40,32 +53,64 @@ export const startEmailWorker = () => {
         return;
       }
 
-      // 4. Fake processing operation
       try {
-        console.log(`Processing Job ${emailJobId} (fake send)...`);
+        // 4. Check Distributed Rate Limits & Minimum Delay
+        const rateLimit = await rateLimiter.reserveSendSlot(dbJob.senderId);
 
-        // Simulating some async work
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        if (!rateLimit.allowed && rateLimit.nextAllowedTimeMs) {
+          console.log(
+            `Rate limit reached for sender ${dbJob.senderId}. Rescheduling to ${new Date(rateLimit.nextAllowedTimeMs).toISOString()}`,
+          );
 
-        // Throw an error 5% of the time for testing failure handling if needed?
-        // No, we keep deterministic behavior for Phase 3. Real errors would be thrown.
+          // Revert claim so it can be re-processed later
+          await emailJobRepo.updateStatus(emailJobId, EmailJobStatus.SCHEDULED);
 
-        // 5. Persist success
-        await emailJobRepo.updateStatus(emailJobId, EmailJobStatus.SENT, {
-          sentAt: new Date(),
+          // Move job to delayed in BullMQ natively
+          await job.moveToDelayed(rateLimit.nextAllowedTimeMs, job.token);
+
+          // Throwing DelayedError instructs BullMQ that the job was successfully delayed
+          throw new DelayedError();
+        }
+
+        // 5. Send Real Email
+        const sender = await senderRepo.findById(dbJob.senderId);
+        if (!sender) {
+          throw new Error(`Sender ${dbJob.senderId} not found`);
+        }
+
+        const fromAddress = config.SMTP_FROM.replace('test@reachinbox.test', sender.email);
+
+        const result = await smtpClient.send({
+          from: fromAddress,
+          to: dbJob.recipient,
+          subject: dbJob.subject,
+          body: dbJob.body,
         });
 
-        console.log(`Job ${emailJobId} sent successfully.`);
+        if (!result.success) {
+          throw new Error(result.error || 'Unknown SMTP error');
+        }
+
+        // 6. Persist success
+        await emailJobRepo.updateStatus(emailJobId, EmailJobStatus.SENT, {
+          sentAt: new Date(),
+          providerMessageId: result.messageId,
+        });
+
+        console.log(`Job ${emailJobId} sent successfully via SMTP.`);
       } catch (error) {
+        // If it's a DelayedError, don't mark as failed, let it propagate so BullMQ handles it
+        if (error instanceof DelayedError) {
+          throw error;
+        }
+
         console.error(`Error processing job ${emailJobId}:`, error);
 
-        // Persist failure
         await emailJobRepo.updateStatus(emailJobId, EmailJobStatus.FAILED, {
           failedAt: new Date(),
           errorMessage: error instanceof Error ? error.message : 'Unknown error',
         });
 
-        // Bubble up the error to let BullMQ know it failed
         throw error;
       }
     },
