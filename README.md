@@ -282,15 +282,7 @@ docker compose up --build -d
 
 ## Demo
 
-When recording a demo video for this repository, you should demonstrate:
-1. **Login:** Successfully authenticating via Google.
-2. **Compose Campaign:** The empty datetime field, filling out a CSV/JSON payload, and selecting a future date.
-3. **Scheduled Emails:** Submitting the campaign and observing the immediate, crash-free navigation to the Details dashboard.
-4. **Sent Emails:** Observing the UI reflect the `SCHEDULED` to `SENT` transition.
-5. **Validation Error:** Attempting to schedule a campaign in the past to demonstrate the human-readable UI protection.
-6. **Persistence:** (Optional) Restarting the backend worker during a dispatch to show BullMQ's automatic recovery.
-
-*(Demo URL placeholder)*
+*([Demo URL](https://github.com/AnveshSrivastava/Email-Job-Scheduler))*
 
 ## Known Limitations
 
