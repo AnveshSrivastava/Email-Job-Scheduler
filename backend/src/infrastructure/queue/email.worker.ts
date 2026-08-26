@@ -35,7 +35,7 @@ export const startEmailWorker = (deps: WorkerDependencies = {}) => {
     async (job: Job<EmailQueueJobPayload>) => {
       const { emailJobId } = job.data;
 
-      const dbJob = await emailJobRepo.findById(emailJobId);
+      const dbJob = await emailJobRepo.findByIdWithBatch(emailJobId);
       if (!dbJob) {
         console.warn(`Job ${emailJobId} not found in DB. Skipping.`);
         return;
@@ -55,7 +55,21 @@ export const startEmailWorker = (deps: WorkerDependencies = {}) => {
 
       try {
         // 4. Check Distributed Rate Limits & Minimum Delay
-        const rateLimit = await rateLimiter.reserveSendSlot(dbJob.senderId);
+        const effectiveHourlyLimit = dbJob.batch.hourlyLimit || config.MAX_EMAILS_PER_HOUR_PER_SENDER;
+        const currentHourString = new Date().toISOString().substring(0, 13);
+        const hourKey = `email-rate:${dbJob.senderId}:${currentHourString}`;
+        
+        console.log(`\n[RATE_LIMIT]
+jobId=${emailJobId}
+senderId=${dbJob.senderId}
+hourlyLimit=${effectiveHourlyLimit}
+hourKey=${hourKey}`);
+
+        const rateLimit = await rateLimiter.reserveSendSlot(dbJob.senderId, new Date(), effectiveHourlyLimit);
+        
+        console.log(`result=${rateLimit.allowed}
+nextAllowed=${rateLimit.nextAllowedTimeMs ? new Date(rateLimit.nextAllowedTimeMs).toISOString() : 'none'}
+\n`);
 
         if (!rateLimit.allowed && rateLimit.nextAllowedTimeMs) {
           console.log(
@@ -63,7 +77,7 @@ export const startEmailWorker = (deps: WorkerDependencies = {}) => {
           );
 
           // Revert claim so it can be re-processed later
-          await emailJobRepo.updateStatus(emailJobId, EmailJobStatus.SCHEDULED);
+          await emailJobRepo.updateStatus(emailJobId, EmailJobStatus.SCHEDULED, { scheduledAt: new Date(rateLimit.nextAllowedTimeMs) });
 
           // Move job to delayed in BullMQ natively
           await job.moveToDelayed(rateLimit.nextAllowedTimeMs, job.token);
@@ -73,6 +87,11 @@ export const startEmailWorker = (deps: WorkerDependencies = {}) => {
         }
 
         // 5. Send Real Email
+        console.log(`\n[SMTP]
+jobId=${emailJobId}
+senderId=${dbJob.senderId}
+recipient=${dbJob.recipient}\n`);
+        
         const sender = await senderRepo.findById(dbJob.senderId);
         if (!sender) {
           throw new Error(`Sender ${dbJob.senderId} not found`);
@@ -100,7 +119,7 @@ export const startEmailWorker = (deps: WorkerDependencies = {}) => {
         console.log(`Job ${emailJobId} sent successfully via SMTP.`);
       } catch (error) {
         // If it's a DelayedError, don't mark as failed, let it propagate so BullMQ handles it
-        if (error instanceof DelayedError) {
+        if (error instanceof DelayedError || (error && (error as any).name === 'DelayedError')) {
           throw error;
         }
 

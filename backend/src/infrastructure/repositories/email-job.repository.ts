@@ -11,6 +11,10 @@ export class EmailJobRepository {
     return this.prisma.emailJob.findUnique({ where: { id } });
   }
 
+  async findByIdWithBatch(id: string) {
+    return this.prisma.emailJob.findUnique({ where: { id }, include: { batch: true } });
+  }
+
   async findByBatchId(
     batchId: string,
     limit: number = 50,
@@ -58,7 +62,7 @@ export class EmailJobRepository {
     id: string,
     status: EmailJobStatus,
     extra: Partial<
-      Pick<EmailJob, 'sentAt' | 'failedAt' | 'errorMessage' | 'providerMessageId'>
+      Pick<EmailJob, 'sentAt' | 'failedAt' | 'errorMessage' | 'providerMessageId' | 'scheduledAt'>
     > = {},
   ): Promise<EmailJob> {
     return this.prisma.emailJob.update({

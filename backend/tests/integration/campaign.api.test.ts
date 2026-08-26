@@ -75,7 +75,7 @@ describe('Campaign API Integration Tests', () => {
         senderId: senderId1,
         subject: 'Test Campaign',
         body: 'Hello World',
-        startAt: new Date().toISOString(),
+        startAt: new Date(Date.now() + 1000).toISOString(),
         delaySeconds: 5,
         hourlyLimit: 100,
         recipients: [{ email: 'recipient1@example.com' }, { email: 'recipient2@example.com' }],
@@ -110,7 +110,7 @@ describe('Campaign API Integration Tests', () => {
         senderId: senderId1, // Belongs to user 1
         subject: 'Test',
         body: 'Hello',
-        startAt: new Date().toISOString(),
+        startAt: new Date(Date.now() + 1000).toISOString(),
         delaySeconds: 0,
         hourlyLimit: 10,
         recipients: [{ email: 'r@example.com' }],
@@ -130,7 +130,7 @@ describe('Campaign API Integration Tests', () => {
         senderId: senderId1,
         subject: 'Test',
         body: 'Hello',
-        startAt: new Date().toISOString(),
+        startAt: new Date(Date.now() + 1000).toISOString(),
         delaySeconds: 0,
         hourlyLimit: 10,
         recipients: [{ email: 'duplicate@example.com' }, { email: 'duplicate@example.com' }],
@@ -150,7 +150,7 @@ describe('Campaign API Integration Tests', () => {
         senderId: senderId1,
         subject: 'Test',
         body: 'Hello',
-        startAt: new Date().toISOString(),
+        startAt: new Date(Date.now() + 1000).toISOString(),
         delaySeconds: 0,
         hourlyLimit: 10,
         recipients: [{ email: 'test@example.com' }],
@@ -166,7 +166,7 @@ describe('Campaign API Integration Tests', () => {
         senderId: senderId2, // User 2's sender
         subject: 'Test',
         body: 'Hello',
-        startAt: new Date().toISOString(),
+        startAt: new Date(Date.now() + 1000).toISOString(),
         delaySeconds: 0,
         hourlyLimit: 10,
         recipients: [{ email: 'test@example.com' }],
@@ -209,7 +209,7 @@ describe('Campaign API Integration Tests', () => {
         .field('senderId', senderId1)
         .field('subject', 'CSV Campaign')
         .field('body', 'Hello from CSV')
-        .field('startAt', new Date().toISOString())
+        .field('startAt', new Date(Date.now() + 1000).toISOString())
         .field('delaySeconds', 2)
         .field('hourlyLimit', 100)
         .attach('file', csvBuffer, 'recipients.csv');
@@ -227,7 +227,7 @@ describe('Campaign API Integration Tests', () => {
         .field('senderId', senderId1)
         .field('subject', 'CSV')
         .field('body', 'Body')
-        .field('startAt', new Date().toISOString())
+        .field('startAt', new Date(Date.now() + 1000).toISOString())
         .attach('file', csvBuffer, 'bad.csv');
 
       expect(response.status).toBe(400);
@@ -244,7 +244,7 @@ describe('Campaign API Integration Tests', () => {
         senderId: senderId1,
         subject: 'Retrieve Me',
         body: 'Body',
-        startAt: new Date().toISOString(),
+        startAt: new Date(Date.now() + 1000).toISOString(),
         delaySeconds: 1,
         hourlyLimit: 100,
         recipients: [{ email: 'r1@example.com' }, { email: 'r2@example.com' }],
@@ -336,7 +336,7 @@ describe('Campaign API Integration Tests', () => {
           senderId: e2eSenderId,
           subject: 'E2E Campaign',
           body: 'E2E Body',
-          startAt: new Date().toISOString(),
+          startAt: new Date(Date.now() + 1000).toISOString(),
           delaySeconds: 1, // small delay
           hourlyLimit: 100,
           recipients: [{ email: 'e2e1@example.com' }, { email: 'e2e2@example.com' }],
@@ -351,7 +351,7 @@ describe('Campaign API Integration Tests', () => {
         const batchId = response.body.data.batchId;
 
         // Wait a moment for BullMQ to process
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 2500));
 
         // 4-5. Verify batch and jobs persisted and updated
         const batch = await prisma.emailBatch.findUnique({
@@ -368,7 +368,7 @@ describe('Campaign API Integration Tests', () => {
 
         // Job 2 might still be SCHEDULED depending on timing, because delay is 1s
         // Wait another bit to ensure Job 2 fires
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 2500));
 
         const job2 = await prisma.emailJob.findUnique({ where: { id: batch!.jobs[1].id } });
         expect(job2?.status).toBe('SENT');

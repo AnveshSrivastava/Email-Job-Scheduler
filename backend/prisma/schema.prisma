@@ -73,6 +73,7 @@ model EmailJob {
   subject           String
   body              String
   scheduledAt       DateTime
+  originalScheduledAt DateTime?
   status            EmailJobStatus @default(PENDING)
   sentAt            DateTime?
   failedAt          DateTime?

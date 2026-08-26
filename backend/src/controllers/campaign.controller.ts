@@ -18,21 +18,22 @@ const retryCampaignUseCase = new RetryCampaignUseCase(prisma, batchRepo, jobRepo
 
 const createCampaignSchema = z.object({
   senderId: z.string().uuid('Invalid sender ID'),
-  subject: z.string().min(1, 'Subject is required'),
-  body: z.string().min(1, 'Body is required'),
+  subject: z.string().min(1, 'Please enter an email subject.'),
+  body: z.string().min(1, 'Please enter the email body.'),
   startAt: z
     .string()
     .datetime()
-    .transform((str) => new Date(str)),
+    .transform((str) => new Date(str))
+    .refine((date) => date.getTime() > Date.now(), { message: 'Start time cannot be in the past. Please choose a future date and time.' }),
   delaySeconds: z.number().int().min(0, 'Delay must be non-negative'),
   hourlyLimit: z.number().int().positive('Hourly limit must be positive'),
   recipients: z
     .array(
       z.object({
-        email: z.string().email('Invalid email address'),
+        email: z.string().email('One or more recipient email addresses are invalid.'),
       }),
     )
-    .min(1, 'At least one recipient is required'),
+    .min(1, 'Please add at least one recipient.'),
 });
 
 export const createCampaign = async (req: Request, res: Response, next: NextFunction) => {
@@ -42,7 +43,7 @@ export const createCampaign = async (req: Request, res: Response, next: NextFunc
     // 2. Validate payload
     const parsed = createCampaignSchema.safeParse(req.body);
     if (!parsed.success) {
-      throw new ValidationError('Invalid request payload', parsed.error.format());
+      throw new ValidationError('Validation failed', parsed.error.errors.map(e => e.message));
     }
 
     // 3. Ensure no duplicate emails in the request array (assuming requirement)
@@ -93,22 +94,27 @@ export const importCampaignCsv = async (req: Request, res: Response, next: NextF
     // Parse CSV
     const csvContent = req.file.buffer.toString('utf-8');
     if (!csvContent.trim()) {
-      throw new ValidationError('CSV file is empty');
+      throw new ValidationError('The CSV file contains no recipients.');
     }
 
-    const records = parse(csvContent, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-    });
+    let records;
+    try {
+      records = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
+    } catch (e) {
+      throw new ValidationError("We couldn't read this CSV file. Please check that it contains a valid 'email' column.");
+    }
 
     if (records.length === 0) {
-      throw new ValidationError('CSV contains no valid rows');
+      throw new ValidationError('The CSV file contains no recipients.');
     }
 
     // Verify column exists
     if (!('email' in (records as any[])[0])) {
-      throw new ValidationError('CSV must contain an "email" column');
+      throw new ValidationError("Your CSV must contain an 'email' column.");
     }
 
     const recipients = records.map((record: any) => ({
@@ -123,10 +129,7 @@ export const importCampaignCsv = async (req: Request, res: Response, next: NextF
 
     const parsed = createCampaignSchema.safeParse(payloadToValidate);
     if (!parsed.success) {
-      throw new ValidationError(
-        'Invalid request payload from CSV or form data',
-        parsed.error.format(),
-      );
+      throw new ValidationError('Validation failed', parsed.error.errors.map(e => e.message));
     }
 
     // Check duplicates

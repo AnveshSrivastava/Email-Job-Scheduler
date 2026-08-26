@@ -65,6 +65,7 @@ export class CreateCampaignUseCase {
         subject: command.subject,
         body: command.body,
         scheduledAt,
+        originalScheduledAt: scheduledAt,
         status: EmailJobStatus.SCHEDULED,
       };
 

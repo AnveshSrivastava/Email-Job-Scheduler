@@ -43,19 +43,19 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://reachinbox:reachinbox_secret@postgres:5432/reachinbox_scheduler?schema=public
       REDIS_URL: redis://redis:6379
-      WORKER_CONCURRENCY: 5
-      MIN_EMAIL_DELAY_MS: 2000
-      MAX_EMAILS_PER_HOUR_PER_SENDER: 100
-      SMTP_HOST: smtp.ethereal.email
-      SMTP_PORT: 587
-      SMTP_SECURE: 'false'
-      SMTP_USER: 'dummy'
-      SMTP_PASSWORD: 'dummy'
-      SMTP_FROM: 'ReachInbox Scheduler <test@reachinbox.test>'
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+      MIN_EMAIL_DELAY_MS: ${MIN_EMAIL_DELAY_MS:-2000}
+      MAX_EMAILS_PER_HOUR_PER_SENDER: ${MAX_EMAILS_PER_HOUR_PER_SENDER:-100}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
       JWT_SECRET: 'reachinbox-dev-secret-super-safe-123'
-      GOOGLE_CLIENT_ID: 'dummy-client-id'
-      GOOGLE_CLIENT_SECRET: 'dummy-client-secret'
-      GOOGLE_CALLBACK_URL: 'http://localhost:3000/api/v1/auth/google/callback'
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
       FRONTEND_URL: 'http://localhost:8080'
     depends_on:
       postgres:
@@ -68,20 +68,26 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: reachinbox_worker
-    command: node dist/worker.js
+    command: node dist/src/worker.js
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://reachinbox:reachinbox_secret@postgres:5432/reachinbox_scheduler?schema=public
       REDIS_URL: redis://redis:6379
-      WORKER_CONCURRENCY: 5
-      MIN_EMAIL_DELAY_MS: 2000
-      MAX_EMAILS_PER_HOUR_PER_SENDER: 100
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+      MIN_EMAIL_DELAY_MS: ${MIN_EMAIL_DELAY_MS:-2000}
+      MAX_EMAILS_PER_HOUR_PER_SENDER: ${MAX_EMAILS_PER_HOUR_PER_SENDER:-100}
       SMTP_HOST: smtp.ethereal.email
       SMTP_PORT: 587
       SMTP_SECURE: 'false'
-      SMTP_USER: 'dummy'
-      SMTP_PASSWORD: 'dummy'
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: 'ReachInbox Scheduler <test@reachinbox.test>'
+      JWT_SECRET: 'reachinbox-dev-secret-super-safe-123'
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
+      FRONTEND_URL: 'http://localhost:8080'
+
     depends_on:
       postgres:
         condition: service_healthy

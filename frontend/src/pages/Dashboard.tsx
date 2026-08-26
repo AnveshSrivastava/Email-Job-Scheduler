@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import type { Sender, Campaign } from '../types';
 import { Plus, List, ArrowRight } from 'lucide-react';
+import { getApiErrorMessage } from '../utils/apiError';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -20,7 +21,19 @@ export const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'json' | 'csv'>('json');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [startAt, setStartAt] = useState(new Date().toISOString().slice(0, 16));
+
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  const getLocalDatetime = () => {
+    const now = new Date(currentTime);
+    const offset = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime() - offset).toISOString().slice(0, 16);
+  };
+  const [startAt, setStartAt] = useState('');
   const [delaySeconds, setDelaySeconds] = useState(2);
   const [hourlyLimit, setHourlyLimit] = useState(100);
   const [recipients, setRecipients] = useState('');
@@ -44,13 +57,7 @@ export const Dashboard: React.FC = () => {
         setSenderId(sendersRes.data.data[0].id);
       }
     } catch (err: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorObj = err as any;
-      setError(
-        errorObj.response?.data?.error?.message ||
-          errorObj.message ||
-          'Failed to load dashboard data',
-      );
+      setError(getApiErrorMessage(err));
     } finally {
       setFetchingData(false);
     }
@@ -74,11 +81,7 @@ export const Dashboard: React.FC = () => {
       setNewSenderEmail('');
       setNewSenderName('');
     } catch (err: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorObj = err as any;
-      setError(
-        errorObj.response?.data?.error?.message || errorObj.message || 'Failed to create sender',
-      );
+      setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -88,6 +91,19 @@ export const Dashboard: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    if (!startAt) {
+      setError('Please choose a date and time for sending.');
+      setLoading(false);
+      return;
+    }
+    const startDate = new Date(startAt);
+    if (startDate.getTime() <= Date.now()) {
+      setError('That time has already passed. Please choose a future date and time.');
+      setLoading(false);
+      return;
+    }
+
 
     try {
       const recipientList = recipients
@@ -105,11 +121,14 @@ export const Dashboard: React.FC = () => {
       };
 
       const res = await apiClient.post('/campaigns', payload);
-      navigate(`/campaigns/${res.data.data.batch.id}`);
+            const batchId = res.data?.data?.batchId || res.data?.data?.id;
+      if (batchId) {
+        navigate(`/campaigns/${batchId}`);
+      } else {
+        setError('Campaign was created successfully, but we couldn\'t open its details. Please refresh your campaigns.');
+      }
     } catch (err: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorObj = err as any;
-      setError(errorObj.response?.data?.error?.message || errorObj.message || 'An error occurred');
+      setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -119,6 +138,16 @@ export const Dashboard: React.FC = () => {
     e.preventDefault();
     if (!file) {
       setError('Please select a CSV file');
+      return;
+    }
+
+    if (!startAt) {
+      setError('Please choose a date and time for sending.');
+      return;
+    }
+    const startDate = new Date(startAt);
+    if (startDate.getTime() <= Date.now()) {
+      setError('That time has already passed. Please choose a future date and time.');
       return;
     }
 
@@ -138,11 +167,14 @@ export const Dashboard: React.FC = () => {
       const res = await apiClient.post('/campaigns/import', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      navigate(`/campaigns/${res.data.data.batch.id}`);
+            const batchId = res.data?.data?.batchId || res.data?.data?.id;
+      if (batchId) {
+        navigate(`/campaigns/${batchId}`);
+      } else {
+        setError('Campaign was created successfully, but we couldn\'t open its details. Please refresh your campaigns.');
+      }
     } catch (err: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorObj = err as any;
-      setError(errorObj.response?.data?.error?.message || errorObj.message || 'An error occurred');
+      setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -311,13 +343,16 @@ export const Dashboard: React.FC = () => {
                       </select>
                     </div>
                     <div className="col-span-2 md:col-span-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="startAt" className="block text-sm font-medium text-gray-700 mb-1">
                         Start At
                       </label>
+                      <p className="text-xs text-gray-500 mb-2">Choose when to send the campaign. Past dates and times cannot be scheduled.</p>
                       <input
                         required
                         type="datetime-local"
+                        min={getLocalDatetime()}
                         value={startAt}
+                        id="startAt"
                         onChange={(e) => setStartAt(e.target.value)}
                         className="w-full border-gray-300 rounded-md shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500"
                       />
@@ -330,16 +365,18 @@ export const Dashboard: React.FC = () => {
                         required
                         type="text"
                         value={subject}
+                        id="subject"
                         onChange={(e) => setSubject(e.target.value)}
                         className="w-full border-gray-300 rounded-md shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
+                      <label htmlFor="body" className="block text-sm font-medium text-gray-700 mb-1">Body</label>
                       <textarea
                         required
                         rows={4}
                         value={body}
+                        id="body"
                         onChange={(e) => setBody(e.target.value)}
                         className="w-full border-gray-300 rounded-md shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500"
                       />
@@ -375,13 +412,14 @@ export const Dashboard: React.FC = () => {
                   {/* Tab Specific Fields */}
                   {activeTab === 'json' ? (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="recipients" className="block text-sm font-medium text-gray-700 mb-1">
                         Recipients (comma or newline separated emails)
                       </label>
                       <textarea
                         required
                         rows={3}
                         value={recipients}
+                        id="recipients"
                         onChange={(e) => setRecipients(e.target.value)}
                         placeholder="alice@example.com, bob@example.com"
                         className="w-full border-gray-300 rounded-md shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500"

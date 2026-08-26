@@ -37,6 +37,7 @@ export class RetryCampaignUseCase {
         failedAt: null,
         errorMessage: null,
         attempts: { increment: 1 },
+        scheduledAt: new Date(),
       },
     });
 
